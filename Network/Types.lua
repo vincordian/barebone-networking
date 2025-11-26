@@ -3,8 +3,8 @@ export type NetworkInfo = {
 
 	Name: string, --Name of the remote
 
-	ServerFunction: (any) -> (any),
-	ClientFunction: (any) -> (any),
+	ServerFunction: (any) -> (nil), --Fires when OnServerEvent ends
+	ClientFunction: (any) -> (nil), --Fires when OnClientEvent ends
 
 	ReturnToServer: (any) -> (any), --Fires when server fires the remote, the client fires to server back with data
 	ReturnToClient: (any) -> (any), --Fires when client fires the remote, the server fires to client back with data
@@ -13,8 +13,8 @@ export type NetworkInfo = {
 }
 
 export type Threads = {
-	Server: {() -> ()},
-	Client: {() -> ()}
+	Server: {() -> ()},--Secondary server functions basically
+	Client: {() -> ()} --Secondary client functions basically
 }
 
 return {}
