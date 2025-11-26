@@ -1,3 +1,12 @@
+--[[Notes:
+
+Client shouldn't create any server functions, only the server should do that
+
+Client should only have a return to server, client function, threads and name
+
+
+]]
+
 --Services--
 
 local Players = game:GetService("Players")
