@@ -1,70 +1,66 @@
 --Services--
 
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
 
 --Modules--
 
-local Types = require(script.Types)
-local Callbacks = require(script.Callbacks)
+local Types = require(script.Parent.Types)
 
 
 --Module--
 
-local Network = {}
-Network.__index = Network
+local Callbacks = {}
 
 
 --Public Functions--
 
---Constructor for the networking module
-function Network.new(NetworkInfo: Types.NetworkInfo)
-	local self = setmetatable({}, Network)
-	
-	self.Name = NetworkInfo.Name
-	self.Place = NetworkInfo.Place
-	self.NetworkingDirection = NetworkInfo.NetworkingDirection
-	
-	self.ServerFunction = NetworkInfo.ServerFunction
-	self.ClientFunction = NetworkInfo.ClientFunction
-	
-	self.ReturnToServer = NetworkInfo.ReturnToServer
-	self.ReturnToClient = NetworkInfo.ReturnToClient
-	
-	self.Target = NetworkInfo.Target or Players:GetPlayers()
-	
-	assert(NetworkInfo.ServerFunction or NetworkInfo.ClientFunction, "There is no function value for client nor server. What you're trying to do is stupid.")
-	assert(next(NetworkInfo.Target), "You're providing an empty target table for the client firing. What you're trying to do is stupid.")
-	
-	self.Remote = Callbacks.CreateCallback(NetworkInfo)
-	
-	return self
-end
-
-
---Fires the targets
-function Network:FireClient(...)
-	assert(RunService:IsServer(), "You're trying to fire clients while on the client. What you're trying to do is stupid.")
-	assert(self.NetworkingDirection == "ServerToClient" or self.NetworkingDirection == "any", "You're trying to fire the client while having the networking direction of ClientToServer.")
-	
-	for _, Player in ipairs(self.Target) do
-		self.Remote:FireClient(Player, ...)
+--Creates a callback--
+function Callbacks.CreateCallback(NetworkInfo: Types.NetworkInfo)
+	local Folder = ReplicatedStorage:FindFirstChild("NetworkRemotes")
+	if not Folder then
+		Folder = Instance.new("Folder")
+		Folder.Name = "NetworkRemotes"
+		Folder.Parent = ReplicatedStorage
 	end
 
-	
-	return self
+	local Remote = Instance.new("RemoteEvent") do
+		assert(not ReplicatedStorage:FindFirstChild(NetworkInfo.Name), `A remote was found with the name of {NetworkInfo.Name} whilst creating a remote with the same name, please rename that remote`)
+
+		Remote.Name = NetworkInfo.Name
+		Remote.Parent = Folder
+
+		Remote.OnServerEvent:Connect(function(...)
+
+			local Arguments = {...}
+
+			if table.find(Arguments, "__return") then
+				return Arguments
+			end
+
+			for _, Player in ipairs(NetworkInfo.Target) do
+				Remote:FireClient(Player, NetworkInfo.ReturnToClient(...), "__return")
+			end
+
+
+			NetworkInfo.ServerFunction(...)
+		end)
+
+		Remote.OnClientEvent:Connect(function(...)
+			local Arguments = {...}
+
+			if table.find(Arguments, "__return") then
+				return Arguments
+			end
+
+			Remote:FireServer(NetworkInfo.ReturnToServer(...), "__return")
+
+			NetworkInfo.ClientFunction(...)
+		end)
+	end
+
+	return Remote
 end
 
 
---Fires the server
-function Network:FireServer(...)
-	assert(RunService:IsClient(), "You're trying to fire server while on the server. What you're trying to do is stupid.")
-	assert(self.NetworkingDirection == "ClientToServer" or self.NetworkingDirection == "any", "You're trying to fire the Server while having the networking direction of ServerToClient.")
-	
-	self.Remote:FireServer(...)
-	
-	return self
-end
-
-
-return Network
+return Callbacks
