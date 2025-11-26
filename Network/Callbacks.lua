@@ -17,12 +17,13 @@ local Callbacks = {}
 --Public Functions--
 
 --Creates a callback
-function Callbacks.CreateCallback(NetworkInfo: Types.NetworkInfo, Threads: Types.Threads)
+function Callbacks.CreateCallback(NetworkInfo: Types.NetworkInfo)
 	local Folder = ReplicatedStorage:FindFirstChild("NetworkRemotes")
 
 	if not Folder then
 		if RunService:IsClient() then
-			Folder = ReplicatedStorage:WaitForChild("NetworkRemotes")
+			Folder = ReplicatedStorage:WaitForChild("NetworkRemotes", 5)
+			assert(Folder, "No folder for network found.")
 		else
 			Folder = Instance.new("Folder")
 			Folder.Name = "NetworkRemotes"
@@ -34,7 +35,8 @@ function Callbacks.CreateCallback(NetworkInfo: Types.NetworkInfo, Threads: Types
 
 	if not Remote then
 		if RunService:IsClient() then
-			Remote = Folder:WaitForChild(NetworkInfo.Name)
+			Remote = Folder:WaitForChild(NetworkInfo.Name, 5)
+			assert(Remote, "No remote for network found.")
 		else
 			Remote = Instance.new("RemoteEvent")
 			Remote.Name = NetworkInfo.Name
@@ -46,14 +48,13 @@ function Callbacks.CreateCallback(NetworkInfo: Types.NetworkInfo, Threads: Types
 		Remote.OnServerEvent:Connect(function(...)
 
 			local Arguments = {...}
-
 			if table.find(Arguments, "__return") then return end
 
 			for _, Player in ipairs(NetworkInfo.Target) do
 				Remote:FireClient(Player, NetworkInfo.ReturnToClient(...), "__return")
 			end
 
-			for _, func in Threads.Server do
+			for _, func in NetworkInfo.Threads.Server do
 				func(...)
 			end
 
@@ -64,12 +65,11 @@ function Callbacks.CreateCallback(NetworkInfo: Types.NetworkInfo, Threads: Types
 	if RunService:IsClient() then
 		Remote.OnClientEvent:Connect(function(...)
 			local Arguments = {...}
-
 			if table.find(Arguments, "__return") then return end
 
 			Remote:FireServer(NetworkInfo.ReturnToServer(...), "__return")
 
-			for _, func in Threads.Client do
+			for _, func in NetworkInfo.Threads.Client do
 				func(...)
 			end
 
