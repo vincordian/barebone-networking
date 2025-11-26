@@ -1,6 +1,7 @@
 --Services--
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
 
 
 --Modules--
@@ -15,53 +16,60 @@ local Callbacks = {}
 
 --Public Functions--
 
---Creates a callback--
+--Creates a callback
 function Callbacks.CreateCallback(NetworkInfo: Types.NetworkInfo, Threads: Types.Threads)
 	local Folder = ReplicatedStorage:FindFirstChild("NetworkRemotes")
+
 	if not Folder then
 		Folder = Instance.new("Folder")
 		Folder.Name = "NetworkRemotes"
 		Folder.Parent = ReplicatedStorage
 	end
+	
+	local Remote = Folder:FindFirstChild(NetworkInfo.Name)
 
+	if not Remote then
+		Remote = Instance.new("RemoteEvent")
+		Remote.Name = NetworkInfo.Name
+		Remote.Parent = Folder
+	end
 
-	if Folder:FindFirstChild(NetworkInfo.Name) then return Folder:FindFirstChild(NetworkInfo.Name) end
+	if RunService:IsServer() then
+		Remote.OnServerEvent:Connect(function(...)
 
-	local Remote = Instance.new("RemoteEvent")
-	Remote.Name = NetworkInfo.Name
-	Remote.Parent = Folder
+			local Arguments = {...}
 
-	Remote.OnServerEvent:Connect(function(...)
+			if table.find(Arguments, "__return") then return end
 
-		local Arguments = {...}
+			for _, Player in ipairs(NetworkInfo.Target) do
+				Remote:FireClient(Player, NetworkInfo.ReturnToClient(...), "__return")
+			end
 
-		if table.find(Arguments, "__return") then return end
+			for _, func in Threads.Server do
+				func(...)
+			end
 
-		for _, Player in ipairs(NetworkInfo.Target) do
-			Remote:FireClient(Player, NetworkInfo.ReturnToClient(...), "__return")
-		end
+			NetworkInfo.ServerFunction(...)
+		end)
+	end
 
-		for _, func in Threads.Server do
-			func(...)
-		end
+	if RunService:IsClient() then
+		Remote.OnClientEvent:Connect(function(...)
+			local Arguments = {...}
 
-		NetworkInfo.ServerFunction(...)
-	end)
+			if table.find(Arguments, "__return") then return end
 
-	Remote.OnClientEvent:Connect(function(...)
-		local Arguments = {...}
+			Remote:FireServer(NetworkInfo.ReturnToServer(...), "__return")
 
-		if table.find(Arguments, "__return") then return end
+			for _, func in Threads.Client do
+				func(...)
+			end
 
-		Remote:FireServer(NetworkInfo.ReturnToServer(...), "__return")
-
-		for _, func in Threads.Client do
-			func(...)
-		end
-
-		NetworkInfo.ClientFunction(...)
-	end)
-
+			NetworkInfo.ClientFunction(...)
+		end)
+	end
+	
+	
 	return Remote
 end
 
