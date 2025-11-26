@@ -21,17 +21,25 @@ function Callbacks.CreateCallback(NetworkInfo: Types.NetworkInfo, Threads: Types
 	local Folder = ReplicatedStorage:FindFirstChild("NetworkRemotes")
 
 	if not Folder then
-		Folder = Instance.new("Folder")
-		Folder.Name = "NetworkRemotes"
-		Folder.Parent = ReplicatedStorage
+		if RunService:IsClient() then
+			Folder = ReplicatedStorage:WaitForChild("NetworkRemotes")
+		else
+			Folder = Instance.new("Folder")
+			Folder.Name = "NetworkRemotes"
+			Folder.Parent = ReplicatedStorage
+		end
 	end
 	
 	local Remote = Folder:FindFirstChild(NetworkInfo.Name)
 
 	if not Remote then
-		Remote = Instance.new("RemoteEvent")
-		Remote.Name = NetworkInfo.Name
-		Remote.Parent = Folder
+		if RunService:IsClient() then
+			Remote = Folder:WaitForChild(NetworkInfo.Name)
+		else
+			Remote = Instance.new("RemoteEvent")
+			Remote.Name = NetworkInfo.Name
+			Remote.Parent = Folder
+		end
 	end
 
 	if RunService:IsServer() then
