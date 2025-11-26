@@ -20,6 +20,19 @@ Network.__index = Network
 --Constructor for the networking module
 function Network.new(NetworkInfo: Types.NetworkInfo, Threads: Types.Threads)
 	local self = setmetatable({}, Network)
+	
+	NetworkInfo.Target = NetworkInfo.Target or Players:GetPlayers()
+	NetworkInfo.ServerFunction = NetworkInfo.ServerFunction or function() end
+	NetworkInfo.ClientFunction = NetworkInfo.ClientFunction or function() end
+	NetworkInfo.ReturnToServer = NetworkInfo.ReturnToServer or function() end
+	NetworkInfo.ReturnToClient = NetworkInfo.ReturnToClient or function() end
+	
+	Threads = Threads or {
+		Server = {},
+		Client = {}
+	}
+	
+	NetworkInfo.NetworkingDirection = NetworkInfo.NetworkingDirection or "any"
 
 	self.Name = NetworkInfo.Name
 	self.NetworkingDirection = NetworkInfo.NetworkingDirection
@@ -30,14 +43,13 @@ function Network.new(NetworkInfo: Types.NetworkInfo, Threads: Types.Threads)
 	self.ReturnToServer = NetworkInfo.ReturnToServer
 	self.ReturnToClient = NetworkInfo.ReturnToClient
 
-	self.Target = NetworkInfo.Target or Players:GetPlayers()
+	self.Target = NetworkInfo.Target
 
-	assert(NetworkInfo.ServerFunction or NetworkInfo.ClientFunction, "There is no function value for client nor server. What you're trying to do is stupid.")
-	assert(next(NetworkInfo.Target), "You're providing an empty target table for the client firing. What you're trying to do is stupid.")
+	assert(#self.Target > 0, "You're providing an empty target table for the client firing. What you're trying to do is stupid.")
 	
 	self.Threads = Threads
 	
-	self.Remote = Callbacks.CreateCallback(NetworkInfo)
+	self.Remote = Callbacks.CreateCallback(NetworkInfo, Threads)
 
 	return self
 end
