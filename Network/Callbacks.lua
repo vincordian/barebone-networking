@@ -16,7 +16,7 @@ local Callbacks = {}
 --Public Functions--
 
 --Creates a callback--
-function Callbacks.CreateCallback(NetworkInfo: Types.NetworkInfo)
+function Callbacks.CreateCallback(NetworkInfo: Types.NetworkInfo, Threads: Types.Threads)
 	local Folder = ReplicatedStorage:FindFirstChild("NetworkRemotes")
 	if not Folder then
 		Folder = Instance.new("Folder")
@@ -24,40 +24,43 @@ function Callbacks.CreateCallback(NetworkInfo: Types.NetworkInfo)
 		Folder.Parent = ReplicatedStorage
 	end
 
-	local Remote = Instance.new("RemoteEvent") do
-		assert(not ReplicatedStorage:FindFirstChild(NetworkInfo.Name), `A remote was found with the name of {NetworkInfo.Name} whilst creating a remote with the same name, please rename that remote`)
 
-		Remote.Name = NetworkInfo.Name
-		Remote.Parent = Folder
+	if Folder:FindFirstChild(NetworkInfo.Name) then return Folder:FindFirstChild(NetworkInfo.Name) end
 
-		Remote.OnServerEvent:Connect(function(...)
+	local Remote = Instance.new("RemoteEvent")
+	Remote.Name = NetworkInfo.Name
+	Remote.Parent = Folder
 
-			local Arguments = {...}
+	Remote.OnServerEvent:Connect(function(...)
 
-			if table.find(Arguments, "__return") then
-				return Arguments
-			end
+		local Arguments = {...}
 
-			for _, Player in ipairs(NetworkInfo.Target) do
-				Remote:FireClient(Player, NetworkInfo.ReturnToClient(...), "__return")
-			end
+		if table.find(Arguments, "__return") then return end
 
+		for _, Player in ipairs(NetworkInfo.Target) do
+			Remote:FireClient(Player, NetworkInfo.ReturnToClient(...), "__return")
+		end
 
-			NetworkInfo.ServerFunction(...)
-		end)
+		for _, func in Threads.Server do
+			func(...)
+		end
 
-		Remote.OnClientEvent:Connect(function(...)
-			local Arguments = {...}
+		NetworkInfo.ServerFunction(...)
+	end)
 
-			if table.find(Arguments, "__return") then
-				return Arguments
-			end
+	Remote.OnClientEvent:Connect(function(...)
+		local Arguments = {...}
 
-			Remote:FireServer(NetworkInfo.ReturnToServer(...), "__return")
+		if table.find(Arguments, "__return") then return end
 
-			NetworkInfo.ClientFunction(...)
-		end)
-	end
+		Remote:FireServer(NetworkInfo.ReturnToServer(...), "__return")
+
+		for _, func in Threads.Client do
+			func(...)
+		end
+
+		NetworkInfo.ClientFunction(...)
+	end)
 
 	return Remote
 end
