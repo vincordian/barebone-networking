@@ -1,10 +1,6 @@
 --[[Notes:
 
-Client shouldn't create any server functions, only the server should do that
-
-Client should only have a return to server, client function, threads and name
-
-
+Client shouldn't create any server functions, only the server should do that & vice versa
 ]]
 
 --Services--
@@ -23,23 +19,36 @@ local Callbacks = require(script.Callbacks)
 local Network = {}
 Network.__index = Network
 
+--Constants--
+
+local THREADS_TEMPLATE = table.freeze {
+	Server = {},
+	Client = {},
+	
+	ServerReturnThreads = {},
+	ClientReturnThreads = {}
+}
 
 --Public Functions--
 
 --Constructor for the networking module
-function Network.new(NetworkInfo: Types.NetworkInfo, Threads: Types.Threads)
+function Network.new(NetworkInfo: Types.NetworkInfo)
 	local self = setmetatable({}, Network)
 	
-	NetworkInfo.Target = NetworkInfo.Target or Players:GetPlayers()
+	NetworkInfo.Target = if RunService:IsClient() then nil else NetworkInfo.Target or Players:GetPlayers()
 	NetworkInfo.ServerFunction = NetworkInfo.ServerFunction or function() end
 	NetworkInfo.ClientFunction = NetworkInfo.ClientFunction or function() end
-	NetworkInfo.ReturnToServer = NetworkInfo.ReturnToServer or function() end
-	NetworkInfo.ReturnToClient = NetworkInfo.ReturnToClient or function() end
+	NetworkInfo.ReturnToServer = NetworkInfo.ReturnToServer or function(...) return ... end
+	NetworkInfo.ReturnToClient = NetworkInfo.ReturnToClient or function(...) return ... end
+	NetworkInfo.AutoAddPlayers = if RunService:IsClient() then false else NetworkInfo.AutoAddPlayers or false
 	
-	Threads = Threads or {
-		Server = {},
-		Client = {}
-	}
+	NetworkInfo.Threads = NetworkInfo.Threads or THREADS_TEMPLATE
+	
+	for ThreadType, _ in THREADS_TEMPLATE do
+		if not NetworkInfo.Threads[ThreadType] then
+			THREADS_TEMPLATE[ThreadType] = {}
+		end
+	end
 	
 	NetworkInfo.NetworkingDirection = NetworkInfo.NetworkingDirection or "any"
 
@@ -51,14 +60,20 @@ function Network.new(NetworkInfo: Types.NetworkInfo, Threads: Types.Threads)
 
 	self.ReturnToServer = NetworkInfo.ReturnToServer
 	self.ReturnToClient = NetworkInfo.ReturnToClient
-
+	
+	self.AutoAddPlayers = NetworkInfo.AutoAddPlayers
+	
 	self.Target = NetworkInfo.Target
-
-	assert(#self.Target > 0, "You're providing an empty target table for the client firing. What you're trying to do is stupid.")
 	
-	self.Threads = Threads
+	self.AutoAddPlayersConnection = Players.PlayerAdded:Connect(function(Player)
+		if self.AutoAddPlayers then
+			table.insert(self.Target, Player)
+		else
+			self.AutoAddPlayersConnection:Disconnect()
+		end
+	end)
 	
-	self.Remote = Callbacks.CreateCallback(NetworkInfo, Threads)
+	self.Remote = Callbacks.CreateCallback(NetworkInfo)
 
 	return self
 end
@@ -81,10 +96,18 @@ end
 function Network:FireServer(...)
 	assert(RunService:IsClient(), "You're trying to fire server while on the server. What you're trying to do is stupid.")
 	assert(self.NetworkingDirection == "ClientToServer" or self.NetworkingDirection == "any", "You're trying to fire the Server while having the networking direction of ServerToClient.")
-
+	
 	self.Remote:FireServer(...)
 
 	return self
+end
+
+
+--Ends the network, should be used on the server
+function Network:End()
+	assert(RunService:IsServer(), "You're trying to end the network while on the client. What you're trying to do is stupid.")
+	self.Remote:Destroy()
+	self = nil
 end
 
 
