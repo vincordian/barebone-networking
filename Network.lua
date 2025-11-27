@@ -47,9 +47,9 @@ local Network = Network.new {
 ]=]
 function Network.new(NetworkInfo: Types.NetworkInfo)
 	local self = setmetatable({}, Network)
-	
-	if RunService:IsServer() then assert(not NetworkInfo.ClientFunction, "You're trying to create a client function while on the server. What you're trying to do is stupid.") assert(not NetworkInfo.ReturnToServer, "You're trying to create a server return while on the client. What you're trying to do is stupid.") end
-	if RunService:IsClient() then assert(not NetworkInfo.ServerFunction, "You're trying to create a server function while on the client. What you're trying to do is stupid.") assert(not NetworkInfo.ReturnToClient, "You're trying to create a client return while on the server. What you're trying to do is stupid.") end
+
+	if RunService:IsServer() then assert(not NetworkInfo.ClientFunction, "You're trying to create a client function while on the server. What you're trying to do is stupid.") assert(not NetworkInfo.ReturnToServer, "You're trying to create a server return while on the server. What you're trying to do is stupid.") end
+	if RunService:IsClient() then assert(not NetworkInfo.ServerFunction, "You're trying to create a server function while on the client. What you're trying to do is stupid.") assert(not NetworkInfo.ReturnToClient, "You're trying to create a client return while on the client. What you're trying to do is stupid.") end
 
 	NetworkInfo.Target = if RunService:IsClient() then {} else NetworkInfo.Target or Players:GetPlayers()
 	NetworkInfo.ServerFunction = NetworkInfo.ServerFunction or function() end
