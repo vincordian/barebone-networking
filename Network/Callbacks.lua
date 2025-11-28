@@ -50,15 +50,13 @@ function Callbacks.CreateCallback(NetworkInfo: Types.NetworkInfo)
 	if RunService:IsServer() then
 		Remote.OnServerEvent:Connect(function(Player, ...)
 
-
-
 			local Arguments = {...}
-			if table.find(Arguments, "__return") then
-				
+			if Arguments[#Arguments] == "__return" then
+
 				if NetworkInfo.ServerFunctionCalledOnReturn then
 					NetworkInfo.ServerFunction(...)
 				end
-				
+
 				return
 			end
 
@@ -75,14 +73,13 @@ function Callbacks.CreateCallback(NetworkInfo: Types.NetworkInfo)
 	if RunService:IsClient() then
 		Remote.OnClientEvent:Connect(function(...)
 
-
 			local Arguments = {...}
-			if table.find(Arguments, "__return") then
-				
+			if Arguments[#Arguments] == "__return" then
+
 				if NetworkInfo.ClientFunctionCalledOnReturn then
 					NetworkInfo.ClientFunction(...)
 				end
-				
+
 				return
 			end
 
