@@ -62,7 +62,7 @@ function Network.new(NetworkInfo: Types.NetworkInfo)
 
 	for ThreadType, _ in THREADS_TEMPLATE do
 		if not NetworkInfo.Threads[ThreadType] then
-			THREADS_TEMPLATE[ThreadType] = {}
+			NetworkInfo.Threads[ThreadType] = {}
 		end
 	end
 
