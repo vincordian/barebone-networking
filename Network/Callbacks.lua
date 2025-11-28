@@ -18,6 +18,8 @@ local Callbacks = {}
 
 --Creates a callback
 function Callbacks.CreateCallback(NetworkInfo: Types.NetworkInfo)
+
+
 	local Folder = ReplicatedStorage:FindFirstChild("NetworkRemotes")
 
 	if not Folder then
@@ -44,17 +46,22 @@ function Callbacks.CreateCallback(NetworkInfo: Types.NetworkInfo)
 		end
 	end
 
+	NetworkInfo.Remote = Remote
+
 	if RunService:IsServer() then
-		Remote.OnServerEvent:Connect(function(...)
+		NetworkInfo.Remote.OnServerEvent:Connect(function(...)
 
+			if NetworkInfo.ServerFunctionCalledOnReturn then
+				NetworkInfo.ServerFunction(...)
+			end
 
-			NetworkInfo.ServerFunction(...)
-			
 			local Arguments = {...}
 			if table.find(Arguments, "__return") then return end
 
+			NetworkInfo.ServerFunction(...)
+
 			for _, Player in ipairs(NetworkInfo.Target) do
-				Remote:FireClient(Player, NetworkInfo.ReturnToClient(...), "__return")
+				NetworkInfo.Remote:FireClient(Player, NetworkInfo.ReturnToClient(...), "__return")
 			end
 
 			for _, func in NetworkInfo.Threads.Server do
@@ -64,12 +71,16 @@ function Callbacks.CreateCallback(NetworkInfo: Types.NetworkInfo)
 	end
 
 	if RunService:IsClient() then
-		Remote.OnClientEvent:Connect(function(...)
-			
-			NetworkInfo.ClientFunction(...)
-			
+		NetworkInfo.Remote.OnClientEvent:Connect(function(...)
+
+			if NetworkInfo.ClientFunctionCalledOnReturn then
+				NetworkInfo.ClientFunction(...)
+			end
+
 			local Arguments = {...}
 			if table.find(Arguments, "__return") then return end
+
+			NetworkInfo.ClientFunction(...)
 
 			Remote:FireServer(NetworkInfo.ReturnToServer(...), "__return")
 
@@ -79,8 +90,13 @@ function Callbacks.CreateCallback(NetworkInfo: Types.NetworkInfo)
 		end)
 	end
 
-
 	return Remote
+end
+
+
+--Clears the remote
+function Callbacks.ClearRemote(Remote)
+	Remote:Destroy()
 end
 
 
