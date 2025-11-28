@@ -30,7 +30,7 @@ function Callbacks.CreateCallback(NetworkInfo: Types.NetworkInfo)
 			Folder.Parent = ReplicatedStorage
 		end
 	end
-	
+
 	local Remote = Folder:FindFirstChild(NetworkInfo.Name)
 
 	if not Remote then
@@ -47,6 +47,9 @@ function Callbacks.CreateCallback(NetworkInfo: Types.NetworkInfo)
 	if RunService:IsServer() then
 		Remote.OnServerEvent:Connect(function(...)
 
+
+			NetworkInfo.ServerFunction(...)
+			
 			local Arguments = {...}
 			if table.find(Arguments, "__return") then return end
 
@@ -57,13 +60,14 @@ function Callbacks.CreateCallback(NetworkInfo: Types.NetworkInfo)
 			for _, func in NetworkInfo.Threads.Server do
 				func(...)
 			end
-
-			NetworkInfo.ServerFunction(...)
 		end)
 	end
 
 	if RunService:IsClient() then
 		Remote.OnClientEvent:Connect(function(...)
+			
+			NetworkInfo.ClientFunction(...)
+			
 			local Arguments = {...}
 			if table.find(Arguments, "__return") then return end
 
@@ -72,12 +76,10 @@ function Callbacks.CreateCallback(NetworkInfo: Types.NetworkInfo)
 			for _, func in NetworkInfo.Threads.Client do
 				func(...)
 			end
-
-			NetworkInfo.ClientFunction(...)
 		end)
 	end
-	
-	
+
+
 	return Remote
 end
 
