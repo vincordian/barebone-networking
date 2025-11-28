@@ -46,23 +46,25 @@ function Callbacks.CreateCallback(NetworkInfo: Types.NetworkInfo)
 		end
 	end
 
-	NetworkInfo.Remote = Remote
 
 	if RunService:IsServer() then
-		NetworkInfo.Remote.OnServerEvent:Connect(function(...)
+		Remote.OnServerEvent:Connect(function(Player, ...)
 
-			if NetworkInfo.ServerFunctionCalledOnReturn then
-				NetworkInfo.ServerFunction(...)
-			end
+
 
 			local Arguments = {...}
-			if table.find(Arguments, "__return") then return end
+			if table.find(Arguments, "__return") then
+				
+				if NetworkInfo.ServerFunctionCalledOnReturn then
+					NetworkInfo.ServerFunction(...)
+				end
+				
+				return
+			end
 
 			NetworkInfo.ServerFunction(...)
 
-			for _, Player in ipairs(NetworkInfo.Target) do
-				NetworkInfo.Remote:FireClient(Player, NetworkInfo.ReturnToClient(...), "__return")
-			end
+			Remote:FireClient(Player, NetworkInfo.ReturnToClient(...), "__return")
 
 			for _, func in NetworkInfo.Threads.Server do
 				func(...)
@@ -71,14 +73,18 @@ function Callbacks.CreateCallback(NetworkInfo: Types.NetworkInfo)
 	end
 
 	if RunService:IsClient() then
-		NetworkInfo.Remote.OnClientEvent:Connect(function(...)
+		Remote.OnClientEvent:Connect(function(...)
 
-			if NetworkInfo.ClientFunctionCalledOnReturn then
-				NetworkInfo.ClientFunction(...)
-			end
 
 			local Arguments = {...}
-			if table.find(Arguments, "__return") then return end
+			if table.find(Arguments, "__return") then
+				
+				if NetworkInfo.ClientFunctionCalledOnReturn then
+					NetworkInfo.ClientFunction(...)
+				end
+				
+				return
+			end
 
 			NetworkInfo.ClientFunction(...)
 
