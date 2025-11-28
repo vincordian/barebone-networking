@@ -50,15 +50,23 @@ function Network.new(NetworkInfo: Types.NetworkInfo)
 
 	if RunService:IsServer() then assert(not NetworkInfo.ClientFunction, "You're trying to create a client function while on the server. What you're trying to do is stupid.") assert(not NetworkInfo.ReturnToServer, "You're trying to create a server return while on the server. What you're trying to do is stupid.") end
 	if RunService:IsClient() then assert(not NetworkInfo.ServerFunction, "You're trying to create a server function while on the client. What you're trying to do is stupid.") assert(not NetworkInfo.ReturnToClient, "You're trying to create a client return while on the client. What you're trying to do is stupid.") end
-
+	
+	NetworkInfo.NetworkingDirection = NetworkInfo.NetworkingDirection or "any"
+	
 	NetworkInfo.Target = if RunService:IsClient() then {} else NetworkInfo.Target or Players:GetPlayers()
+	
 	NetworkInfo.ServerFunction = NetworkInfo.ServerFunction or function() end
 	NetworkInfo.ClientFunction = NetworkInfo.ClientFunction or function() end
+	
 	NetworkInfo.ReturnToServer = NetworkInfo.ReturnToServer or function(...) return ... end
 	NetworkInfo.ReturnToClient = NetworkInfo.ReturnToClient or function(...) return ... end
+	
 	NetworkInfo.AutoAddPlayers = if RunService:IsClient() then false else NetworkInfo.AutoAddPlayers or false
+	
+	NetworkInfo.ServerFunctionCalledOnReturn = NetworkInfo.ServerFunctionCalledOnReturn or false
+	NetworkInfo.ClientFunctionCalledOnReturn = NetworkInfo.ClientFunctionCalledOnReturn
 
-	NetworkInfo.Threads = NetworkInfo.Threads or THREADS_TEMPLATE
+	NetworkInfo.Threads = NetworkInfo.Threads or table.clone(THREADS_TEMPLATE)
 
 	for ThreadType, _ in THREADS_TEMPLATE do
 		if not NetworkInfo.Threads[ThreadType] then
@@ -66,20 +74,25 @@ function Network.new(NetworkInfo: Types.NetworkInfo)
 		end
 	end
 
-	NetworkInfo.NetworkingDirection = NetworkInfo.NetworkingDirection or "any"
+
 
 	self.Name = NetworkInfo.Name
 	self.NetworkingDirection = NetworkInfo.NetworkingDirection
+	
+	self.Target = NetworkInfo.Target
 
 	self.ServerFunction = NetworkInfo.ServerFunction
 	self.ClientFunction = NetworkInfo.ClientFunction
-
+	
 	self.ReturnToServer = NetworkInfo.ReturnToServer
 	self.ReturnToClient = NetworkInfo.ReturnToClient
-
+	
 	self.AutoAddPlayers = NetworkInfo.AutoAddPlayers
-
-	self.Target = NetworkInfo.Target
+	
+	self.ServerFunctionCalledOnReturn = NetworkInfo.ServerFunctionCalledOnReturn
+	self.ClientFunctionCalledOnReturn = NetworkInfo.ClientFunctionCalledOnReturn
+	
+	self.Threads = NetworkInfo.Threads
 
 	self.AutoAddPlayersConnection = Players.PlayerAdded:Connect(function(Player)
 		if self.AutoAddPlayers then
@@ -89,7 +102,9 @@ function Network.new(NetworkInfo: Types.NetworkInfo)
 		end
 	end)
 
-	self.Remote = Callbacks.CreateCallback(NetworkInfo)
+	self.Remote = Callbacks.CreateCallback(self)
+
+	setmetatable(self, {__newindex = function() self:ClearRemote() rawset(self, "Remote", Callbacks.CreateCallback(self)) end, __index = Network})
 
 	return self
 end
@@ -122,8 +137,17 @@ end
 --Ends the network, should be used on the server
 function Network:End()
 	assert(RunService:IsServer(), "You're trying to end the network while on the client. What you're trying to do is stupid.")
-	self.Remote:Destroy()
+	Callbacks.ClearRemote(self.Remote)
 	self = nil
+end
+
+
+--Deletes a callback of a remote
+function Network:ClearRemote()
+	Callbacks.ClearRemote(self.Remote)
+	self.Remote = Callbacks.CreateCallback(self)
+
+	return self
 end
 
 
