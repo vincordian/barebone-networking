@@ -73,9 +73,13 @@ function Network.new(NetworkInfo: Types.NetworkInfo)
 			NetworkInfo.Threads[ThreadType] = {}
 		end
 	end
-
-
-
+	
+	if self.AutoAddPlayers then
+		self.AutoAddPlayersConnection = Players.PlayerAdded:Connect(function(Player)
+			table.insert(self.Target, Player)
+		end)
+	end
+	
 	self.Name = NetworkInfo.Name
 	self.NetworkingDirection = NetworkInfo.NetworkingDirection
 	
@@ -93,14 +97,12 @@ function Network.new(NetworkInfo: Types.NetworkInfo)
 	self.ClientFunctionCalledOnReturn = NetworkInfo.ClientFunctionCalledOnReturn
 	
 	self.Threads = NetworkInfo.Threads
-
-	self.AutoAddPlayersConnection = Players.PlayerAdded:Connect(function(Player)
-		if self.AutoAddPlayers then
+	
+	if self.AutoAddPlayers then
+		local AutoAddPlayersConnection = Players.PlayerAdded:Connect(function(Player)
 			table.insert(self.Target, Player)
-		else
-			self.AutoAddPlayersConnection:Disconnect()
-		end
-	end)
+		end)
+	end
 
 	self.Remote = Callbacks.CreateCallback(self)
 
@@ -138,6 +140,7 @@ end
 function Network:End()
 	assert(RunService:IsServer(), "You're trying to end the network while on the client. What you're trying to do is stupid.")
 	Callbacks.ClearRemote(self.Remote)
+	setmetatable(self, nil)
 	self = nil
 end
 
@@ -150,5 +153,11 @@ function Network:ClearRemote()
 	return self
 end
 
+
+--Ends auto add player connection
+function Network:EndAutoAddPlayerConnection()
+	self.AutoAddPlayersConnection:Disconnect()
+	self.AutoAddPlayersConnection = nil
+end
 
 return Network
