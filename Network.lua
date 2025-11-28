@@ -115,12 +115,16 @@ end
 
 
 --Fires the targets
-function Network:FireClient(...)
+function Network:FireClient(CustomTarget, ...)
 	assert(RunService:IsServer(), "You're trying to fire clients while on the client. What you're trying to do is stupid.")
 	assert(self.NetworkingDirection == "ServerToClient" or self.NetworkingDirection == "any", "You're trying to fire the client while having the networking direction of ClientToServer.")
-
-	for _, Player in ipairs(self.Target) do
-		self.Remote:FireClient(Player, ...)
+	
+	if not CustomTarget then
+		for _, Player in ipairs(self.Target) do
+			self.Remote:FireClient(Player, ...)
+		end
+	else
+		self.Remote:FireClient(CustomTarget, ...)
 	end
 
 	return self
