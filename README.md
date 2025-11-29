@@ -1,13 +1,9 @@
-For the scallywags using my code:
+Use network.new
 
-Use Network.new, you can omit the parenthesis like:
-Network.new {
-Name = "Test"
-ClientFunction = function()
-  print("Hello World")
-end
-}
+Read types for... types
 
-Networks with the same name will hook up to eachother, this is how the client & server communicate.
+Server can't provide client functions & vice versa
 
-Setup the server within 5 seconds of the client, that's the threshold to stop WaitForChild, you can edit this. 
+Networks with the same name will be able to communicate
+
+More notes inside the module itself
