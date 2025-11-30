@@ -100,12 +100,6 @@ function Network.new(NetworkInfo: Types.NetworkInfo)
 
 	self.Threads = NetworkInfo.Threads
 
-	if self.AutoAddPlayers then
-		local AutoAddPlayersConnection = Players.PlayerAdded:Connect(function(Player)
-			table.insert(self.Target, Player)
-		end)
-	end
-
 	self.Remote = Callbacks.CreateCallback(self)
 
 	setmetatable(self, {__newindex = function() self:ClearRemote() rawset(self, "Remote", Callbacks.CreateCallback(self)) end, __index = Network})
@@ -118,7 +112,7 @@ end
 function Network:FireClient(CustomTarget, ...)
 	assert(RunService:IsServer(), "You're trying to fire clients while on the client. What you're trying to do is stupid.")
 	assert(self.NetworkingDirection == "ServerToClient" or self.NetworkingDirection == "any", "You're trying to fire the client while having the networking direction of ClientToServer.")
-	
+
 	if not CustomTarget then
 		for _, Player in ipairs(self.Target) do
 			self.Remote:FireClient(Player, ...)
