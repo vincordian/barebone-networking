@@ -1,23 +1,47 @@
 --[[Notes:
 
-Client shouldn't create any server functions, only the server should do that & vice versa
-
-Server & client share separate modules, and only connect by a remote.
-For example, you create Network.new {Name = "Test", ClientFunction = function() end}, the client function will only work if you're on the client as they share different metatables.
-I was gonna let it do the opposite, letting the server give the client to run functions, but that's already possible with the returns
-
+client & server can only create their respective functions
 
 ]]
+
+--!native
 
 --Services--
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
---Modules--
 
-local Types = require(script.Types)
-local Callbacks = require(script.Callbacks)
+--Types--
+
+export type NetworkInfo = {
+
+	Name: string, --Name of the remote
+
+	NetworkingDirection: "ClientToServer"|"ServerToClient"|"any", --Great if you don't want any accidents to happen
+
+	Target: {Player}|nil, --Will fire all clients if nil
+
+	ServerFunction: (any) -> (nil), --Fires when OnServerEvent ends
+	ClientFunction: (any) -> (nil), --Fires when OnClientEvent ends
+
+	ClientFunctionCalledOnReturn: boolean, --Controls if the client function gets called on return
+
+	ReturnToClient: (any) -> (any), --Fires when client fires the remote, the server fires to client back with data
+
+	AutoAddPlayers: boolean, --Will automatically add players left out to the target table if true
+
+	Threads: {
+		Server: {(any) -> (any)},--Secondary server functions basically
+		Client: {(any) -> (any)}, --Secondary client functions basically
+
+
+		ClientReturnThreads: {(any) -> (any)}, --Fires when server returns data
+	},
+
+	AnticheatFunction: (any) -> (boolean)
+}
 
 
 --Module--
@@ -25,100 +49,163 @@ local Callbacks = require(script.Callbacks)
 local Network = {}
 Network.__index = Network
 
+
 --Constants--
 
-local THREADS_TEMPLATE = table.freeze {
+local THREADS_TEMPLATE = {
 	Server = {},
 	Client = {},
 
-	ServerReturnThreads = {},
 	ClientReturnThreads = {}
 }
+
 
 --Public Functions--
 
 --[=[
-e.g.
+e.g. On server:
+```lua
 local Network = Network.new {
 	Name = "HelloWorld",
 	Target = {Players:FindFirstChild("Player1"), Players:FindFirstChild("Player2")},
 	ServerFunction = function(...)--"..." is an unpacked table of arguments sent when firing with :FireServer()/:FireClient()
 		print(...)
+	end,
+	ReturnToClient = function(...)
+		return table.pack(...)
 	end
 }
+```
 ]=]
 function Network.new(NetworkInfo: Types.NetworkInfo)
+
+	assert(NetworkInfo.Name, "No name provided for the network")
+
+	--Important to do this first, as if done in the later IsServer & isClient and throws an error, will waste memory
+
+	if RunService:IsServer() then
+		assert(not NetworkInfo.ClientFunction, "You're trying to create a client function while on the server. What you're trying to do is stupid.")
+	end
+
+	if RunService:IsClient() then
+		assert(not NetworkInfo.ServerFunction, "You're trying to create a server function while on the client. What you're trying to do is stupid.")
+		assert(not NetworkInfo.ReturnToClient, "You're trying to create a client return while on the client. What you're trying to do is stupid.")
+	end
+
+
 	local self = setmetatable({}, Network)
 
-	if RunService:IsServer() then assert(not NetworkInfo.ClientFunction, "You're trying to create a client function while on the server. What you're trying to do is stupid.") assert(not NetworkInfo.ReturnToServer, "You're trying to create a server return while on the server. What you're trying to do is stupid.") end
-	if RunService:IsClient() then assert(not NetworkInfo.ServerFunction, "You're trying to create a server function while on the client. What you're trying to do is stupid.") assert(not NetworkInfo.ReturnToClient, "You're trying to create a client return while on the client. What you're trying to do is stupid.") end
+	self.Name = NetworkInfo.Name
+	self.NetworkingDirection = NetworkInfo.NetworkingDirection or "any"
 
-	NetworkInfo.NetworkingDirection = NetworkInfo.NetworkingDirection or "any"
+	self.Target = if RunService:IsClient() then {} else NetworkInfo.Target or Players:GetPlayers()
 
-	NetworkInfo.Target = if RunService:IsClient() then {} else NetworkInfo.Target or Players:GetPlayers()
+	self.ServerFunction = NetworkInfo.ServerFunction or function() end
+	self.ClientFunction = NetworkInfo.ClientFunction or function() end
 
-	NetworkInfo.ServerFunction = NetworkInfo.ServerFunction or function() end
-	NetworkInfo.ClientFunction = NetworkInfo.ClientFunction or function() end
+	self.ClientFunctionCalledOnReturn = NetworkInfo.ClientFunctionCalledOnReturn or false
 
-	NetworkInfo.ReturnToServer = NetworkInfo.ReturnToServer or function(...) return ... end
-	NetworkInfo.ReturnToClient = NetworkInfo.ReturnToClient or function(...) return ... end
+	self.ReturnToClient = NetworkInfo.ReturnToClient or function(...) return ... end
 
-	NetworkInfo.AutoAddPlayers = if RunService:IsClient() then false else NetworkInfo.AutoAddPlayers or false
+	self.AutoAddPlayers = if RunService:IsClient() then false else NetworkInfo.AutoAddPlayers or false
 
-	NetworkInfo.ServerFunctionCalledOnReturn = NetworkInfo.ServerFunctionCalledOnReturn or false
-	NetworkInfo.ClientFunctionCalledOnReturn = NetworkInfo.ClientFunctionCalledOnReturn
 
-	NetworkInfo.Threads = NetworkInfo.Threads or table.clone(THREADS_TEMPLATE)
+	self.Threads = NetworkInfo.Threads or table.clone(THREADS_TEMPLATE)
 
 	for ThreadType, _ in THREADS_TEMPLATE do
-		if not NetworkInfo.Threads[ThreadType] then
-			NetworkInfo.Threads[ThreadType] = {}
+		if not self.Threads[ThreadType] then
+			self.Threads[ThreadType] = {}
 		end
 	end
+
+	self.AnticheatFunction = NetworkInfo.AnticheatFunction or function() return true end
 
 	if self.AutoAddPlayers then
 		self.AutoAddPlayersConnection = Players.PlayerAdded:Connect(function(Player)
 			table.insert(self.Target, Player)
 		end)
 	end
+	
+	
+	--a really good way to remove local variables if you don't want them
+	do
+		local Folder = ReplicatedStorage:FindFirstChild("NetworkRemotes")
 
-	self.Name = NetworkInfo.Name
-	self.NetworkingDirection = NetworkInfo.NetworkingDirection
+		if not Folder then
+			if RunService:IsClient() then
+				Folder = ReplicatedStorage:WaitForChild("NetworkRemotes", 5)
+				assert(Folder, "No folder for network found.")
+			else
+				Folder = Instance.new("Folder")
+				Folder.Name = "NetworkRemotes"
+				Folder.Parent = ReplicatedStorage
+			end
+		end
 
-	self.Target = NetworkInfo.Target
+		self.Remote = Folder:FindFirstChild(self.Name)
 
-	self.ServerFunction = NetworkInfo.ServerFunction
-	self.ClientFunction = NetworkInfo.ClientFunction
 
-	self.ReturnToServer = NetworkInfo.ReturnToServer
-	self.ReturnToClient = NetworkInfo.ReturnToClient
+		if not self.Remote then
+			if RunService:IsClient() then
+				self.Remote = Folder:WaitForChild(self.Name, 5)
+				assert(self.Remote, "No remote for network found.")
+			else
+				self.Remote = Instance.new("RemoteEvent")
+				self.Remote.Name = self.Name
+				self.Remote.Parent = Folder
+			end
+		end
 
-	self.AutoAddPlayers = NetworkInfo.AutoAddPlayers
 
-	self.ServerFunctionCalledOnReturn = NetworkInfo.ServerFunctionCalledOnReturn
-	self.ClientFunctionCalledOnReturn = NetworkInfo.ClientFunctionCalledOnReturn
+		if RunService:IsServer() then
+			self.Remote.OnServerEvent:Connect(function(Player, ...)
 
-	self.Threads = NetworkInfo.Threads
+				assert(self.AnticheatFunction(...), `Anticheat triggered by {Player}`)
 
-	self.Remote = Callbacks.CreateCallback(self)
+				self.ServerFunction(...)
+				self.Remote:FireClient(Player, self.ReturnToClient(...), "__return")
 
-	setmetatable(self, {__newindex = function() self:ClearRemote() rawset(self, "Remote", Callbacks.CreateCallback(self)) end, __index = Network})
+				for _, func in self.Threads.Server do
+					func(...)
+				end
+			end)
+		end
+
+
+		if RunService:IsClient() then
+			self.Remote.OnClientEvent:Connect(function(...)
+
+				local Arguments = {...}
+
+				if table.find(Arguments, "__return") then
+					if self.ClientFunctionCalledOnReturn then
+						self.ClientFunction(...)
+					end
+
+					return
+				end
+
+				self.ClientFunction(...)
+
+				for _, func in self.Threads.Client do
+					func(...)
+				end
+			end)
+		end
+
+	end
 
 	return self
 end
 
 
 --Fires the targets
-function Network:FireClient(CustomTarget, ...)
+function Network:FireClient(...)
 	assert(RunService:IsServer(), "You're trying to fire clients while on the client. What you're trying to do is stupid.")
 	assert(self.NetworkingDirection == "ServerToClient" or self.NetworkingDirection == "any", "You're trying to fire the client while having the networking direction of ClientToServer.")
 
-	if not CustomTarget then
-		for _, Player in ipairs(self.Target) do
-			self.Remote:FireClient(Player, ...)
-		end
-	else
-		self.Remote:FireClient(CustomTarget, ...)
+	for _, Player in ipairs(self.Target) do
+		self.Remote:FireClient(Player, ...)
 	end
 
 	return self
@@ -139,18 +226,9 @@ end
 --Ends the network, should be used on the server
 function Network:End()
 	assert(RunService:IsServer(), "You're trying to end the network while on the client. What you're trying to do is stupid.")
-	Callbacks.ClearRemote(self.Remote)
 	setmetatable(self, nil)
+	table.clear(self)
 	self = nil
-end
-
-
---Deletes a callback of a remote
-function Network:ClearRemote()
-	Callbacks.ClearRemote(self.Remote)
-	self.Remote = Callbacks.CreateCallback(self)
-
-	return self
 end
 
 
@@ -158,6 +236,9 @@ end
 function Network:EndAutoAddPlayerConnection()
 	self.AutoAddPlayersConnection:Disconnect()
 	self.AutoAddPlayersConnection = nil
+	
+	return self.Target
 end
+
 
 return Network
