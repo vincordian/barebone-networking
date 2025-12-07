@@ -177,7 +177,11 @@ function Network.new(NetworkInfo: NetworkInfo)
 
 				self.ServerFunction(Player, ...)
 				if self.ReturnToClient then
-					self.Remote:FireClient(Player, self.ReturnToClient(Player, ...), "__return")
+					if type(self.ReturnToClient) == "function" then
+						self.Remote:FireClient(Player, self.ReturnToClient(Player, ...), "__return")
+					end
+					
+					self.Remote:FireClient(Player, ..., "__return")
 				end
 
 				for _, func in self.Threads.Server do
