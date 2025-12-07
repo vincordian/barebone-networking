@@ -63,21 +63,34 @@ local THREADS_TEMPLATE = {
 --Public Functions--
 
 --[=[
-e.g. On server:
-```lua
-local Network = Network.new {
-	Name = "HelloWorld",
-	Target = {Players:FindFirstChild("Player1"), Players:FindFirstChild("Player2")},
-	ServerFunction = function(...)--"..." is an unpacked table of arguments sent when firing with :FireServer()/:FireClient()
-		print(...)
-	end,
-	ReturnToClient = function(...)
-		return table.pack(...)
-	end
-}
-```
+
+	Name: string, --Name of the remote
+
+	NetworkingDirection: "ClientToServer"|"ServerToClient"|"any", --Great if you don't want any accidents to happen
+
+	Target: {Player}|nil, --Will fire all clients if nil
+
+	ServerFunction: (any) -> (nil), --Fires when OnServerEvent ends
+	ClientFunction: (any) -> (nil), --Fires when OnClientEvent ends
+
+	ClientFunctionCalledOnReturn: boolean, --Controls if the client function gets called on return
+
+	ReturnToClient: (any) -> (any), --Fires when client fires the remote, the server fires to client back with data
+
+	AutoAddPlayers: boolean, --Will automatically add players left out to the target table if true
+
+	Threads: {
+		Server: {(any) -> (any)},--Secondary server functions basically
+		Client: {(any) -> (any)}, --Secondary client functions basically
+
+
+		ClientReturnThreads: {(any) -> (any)}, --Fires when server returns data
+	},
+
+	AnticheatFunction: (any) -> (boolean)
+
 ]=]
-function Network.new(NetworkInfo: Types.NetworkInfo)
+function Network.new(NetworkInfo: NetworkInfo)
 
 	assert(NetworkInfo.Name, "No name provided for the network")
 
@@ -125,8 +138,8 @@ function Network.new(NetworkInfo: Types.NetworkInfo)
 			table.insert(self.Target, Player)
 		end)
 	end
-	
-	
+
+
 	--a really good way to remove local variables if you don't want them
 	do
 		local Folder = ReplicatedStorage:FindFirstChild("NetworkRemotes")
@@ -160,13 +173,13 @@ function Network.new(NetworkInfo: Types.NetworkInfo)
 		if RunService:IsServer() then
 			self.Remote.OnServerEvent:Connect(function(Player, ...)
 
-				assert(self.AnticheatFunction(...), `Anticheat triggered by {Player}`)
+				assert(self.AnticheatFunction(Player, ...), `Anticheat triggered by {Player}`)
 
-				self.ServerFunction(...)
-				self.Remote:FireClient(Player, self.ReturnToClient(...), "__return")
+				self.ServerFunction(Player, ...)
+				self.Remote:FireClient(Player, self.ReturnToClient(Player, ...), "__return")
 
 				for _, func in self.Threads.Server do
-					func(...)
+					func(Player, ...)
 				end
 			end)
 		end
@@ -236,7 +249,7 @@ end
 function Network:EndAutoAddPlayerConnection()
 	self.AutoAddPlayersConnection:Disconnect()
 	self.AutoAddPlayersConnection = nil
-	
+
 	return self.Target
 end
 
