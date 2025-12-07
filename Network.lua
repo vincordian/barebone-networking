@@ -28,7 +28,7 @@ export type NetworkInfo = {
 
 	ClientFunctionCalledOnReturn: boolean, --Controls if the client function gets called on return
 
-	ReturnToClient: (any) -> (any), --Fires when client fires the remote, the server fires to client back with data
+	ReturnToClient: (any) -> (any)|true|false|nil, --If true, will use default function of function(Player, ...) return ... end, or the function provided if any
 
 	AutoAddPlayers: boolean, --Will automatically add players left out to the target table if true
 
@@ -118,7 +118,7 @@ function Network.new(NetworkInfo: NetworkInfo)
 
 	self.ClientFunctionCalledOnReturn = NetworkInfo.ClientFunctionCalledOnReturn or false
 
-	self.ReturnToClient = NetworkInfo.ReturnToClient or function(...) return ... end
+	self.ReturnToClient = if NetworkInfo.ReturnToClient then NetworkInfo.ReturnToClient elseif NetworkInfo.ReturnToClient == true then function(Player, ...) return ... end else NetworkInfo.ReturnToClient
 
 	self.AutoAddPlayers = if RunService:IsClient() then false else NetworkInfo.AutoAddPlayers or false
 
@@ -176,7 +176,9 @@ function Network.new(NetworkInfo: NetworkInfo)
 				assert(self.AnticheatFunction(Player, ...), `Anticheat triggered by {Player}`)
 
 				self.ServerFunction(Player, ...)
-				self.Remote:FireClient(Player, self.ReturnToClient(Player, ...), "__return")
+				if self.ReturnToClient then
+					self.Remote:FireClient(Player, self.ReturnToClient(Player, ...), "__return")
+				end
 
 				for _, func in self.Threads.Server do
 					func(Player, ...)
