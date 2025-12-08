@@ -223,7 +223,7 @@ function Network:FireClient(...)
 	assert(RunService:IsServer(), "You're trying to fire clients while on the client. What you're trying to do is stupid.")
 	assert(self.NetworkingDirection == "ServerToClient" or self.NetworkingDirection == "any", "You're trying to fire the client while having the networking direction of ClientToServer.")
 
-	for _, Player in ipairs(self.Target) do
+	for _, Player in self.Target do
 		self.Remote:FireClient(Player, ...)
 	end
 
