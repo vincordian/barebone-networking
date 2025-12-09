@@ -1,7 +1,5 @@
 Use network.new
 
-Read types for... types
-
 Server can't provide client functions & vice versa
 
 Networks with the same name will be able to communicate
