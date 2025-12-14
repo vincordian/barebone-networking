@@ -33,13 +33,6 @@ export type NetworkInfo = {
 	AutoAddPlayers: boolean, --Will automatically add players left out to the target table if true
 
 	Threads: {
-		
-		--[[
-		Not sure why I added this
-		Not really any type of use, everything can be packed into 1 function
-		I'll keep it here for now
-		]]
-		
 		Server: {(any) -> (any)},--Secondary server functions basically
 		Client: {(any) -> (any)}, --Secondary client functions basically
 
@@ -187,7 +180,7 @@ function Network.new(NetworkInfo: NetworkInfo)
 					if type(self.ReturnToClient) == "function" then
 						self.Remote:FireClient(Player, self.ReturnToClient(Player, ...), "__return")
 					end
-
+					
 					self.Remote:FireClient(Player, ..., "__return")
 				end
 
