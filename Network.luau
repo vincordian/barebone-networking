@@ -168,7 +168,7 @@ function Network.new(NetworkInfo: NetworkInfo)
 			end
 		end
 
-		self.Remote = Folder:FindFirstChild(self.Name)
+		self.Remote = Folder:FindFirstChild(self.Main.Name)
 
 		if not self.Remote then
 			if RunService:IsClient() then
