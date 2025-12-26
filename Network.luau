@@ -89,7 +89,7 @@ local function setupSelf(NetworkInfo: NetworkInfo)
 
 	
 	if self.ServerToClient and self.ServerToClient.AutoAddPlayers then
-		Players.PlayerAdded:Connect(function(Player)
+		self.AutoAddPlayersConnection = Players.PlayerAdded:Connect(function(Player)
 			if not table.find(self.ServerToClient.Target, Player) then
 				table.insert(self.ServerToClient.Target, Player)
 			end
