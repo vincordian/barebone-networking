@@ -39,6 +39,7 @@ export type NetworkInfo = {
 		ClientFunction: (any) -> (),
 		ServerFunction: (any) -> ()
 	}
+	
 }
 
 
@@ -108,23 +109,29 @@ end
 		Name: string,
 		NetworkingDirection: "ClientToServer"|"ServerToClient"|"any",
 	},
-	
+
 	ServerToClient: {
 		Target : {[number]:Player},
 		AutoAddPlayers: boolean,
-		
-		ClientCalledOnReturn: boolean,
-		ReturnToClient: (any) -> (any)|boolean,
+
+		ClientFunctionCalledOnReturn: boolean,
+		ReturnToClient: (any) -> (any),
 	},
-	
+
 	Anticheat: {
 		AnticheatFunction: (any) -> (boolean),
 	},
 
+	Functions: {
+		ClientFunction: (any) -> (),
+		ServerFunction: (any) -> ()
+	}
+
 ]=]
 function Network.new(NetworkInfo: NetworkInfo)
-
-	assert(NetworkInfo.Name, "No name provided for the network")
+	
+	assert(NetworkInfo.Main.Name, "No name provided for the network")
+	assert(NetworkInfo.Main.NetworkingDirection, `No networking direction for {NetworkInfo.Main.Name}`)
 
 	--Important to do this first, as if done in the later IsServer & isClient and throws an error, will waste memory
 
