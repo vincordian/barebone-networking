@@ -17,24 +17,24 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 --Types--
 
 export type NetworkInfo = {
-	
+
 	Main: {
 		Name: string,
 		NetworkingDirection: "ClientToServer"|"ServerToClient"|"any",
 	},
-	
+
 	ServerToClient: {
 		Target : {[number]:Player},
 		AutoAddPlayers: boolean,
-		
+
 		ClientFunctionCalledOnReturn: boolean,
 		ReturnToClient: (any) -> (any),
 	},
-	
+
 	Anticheat: {
 		AnticheatFunction: (any) -> (boolean),
 	},
-	
+
 	Functions: {
 		ClientFunction: (any) -> (),
 		ServerFunction: (any) -> ()
@@ -51,46 +51,52 @@ Network.__index = Network
 --Private Functions-- (had to place this infront as I need the network table for this to work)
 
 local function setupSelf(NetworkInfo: NetworkInfo)
-	
+
 	assert(NetworkInfo, "You didn't even provide NetworkInfo what are you doing..")
 	assert(NetworkInfo.Main, "No network main")
-	
+
 	local self = {
-		
+
 		Main = {
 			Name = assert(NetworkInfo.Main.Name, "Network has no name."),
 			NetworkingDirection = assert(NetworkInfo.Main.NetworkingDirection, "Network has no NetworkingDirection.")
 		},
 
 		ServerToClient = NetworkInfo.ServerToClient and {
-			
+
 			Target = NetworkInfo.ServerToClient.Target or Players:GetPlayers(),
 			AutoAddPlayers = NetworkInfo.ServerToClient and NetworkInfo.ServerToClient.AutoAddPlayers or false,
 
 			ClientCalledOnReturn = NetworkInfo.ServerToClient and NetworkInfo.ServerToClient.ClientCalledOnReturn or false,
 			ReturnToClient = NetworkInfo.ServerToClient.ReturnToClient,
-			
+
 		},
 
 		Anticheat = NetworkInfo.Anticheat and {
-			
+
 			AnticheatFunction = NetworkInfo.Anticheat.AnticheatFunction,
-			
+
 		},
-		
+
 		Functions = NetworkInfo.Functions and {
-			
+
 			ClientFunction = NetworkInfo.Functions.ClientFunction,
 			ServerFunction = NetworkInfo.Functions.ServerFunction,
-			
+
 		},
-		
+
 	}
-	
-	
-
 
 	
+	if self.ServerToClient and self.ServerToClient.AutoAddPlayers then
+		Players.PlayerAdded:Connect(function(Player)
+			if not table.find(self.ServerToClient.Target, Player) then
+				table.insert(self.ServerToClient.Target, Player)
+			end
+		end)
+	end
+	
+
 	return self
 end
 
@@ -189,7 +195,7 @@ function Network.new(NetworkInfo: NetworkInfo)
 				local Arguments = {...}
 
 				if self.Functions and self.Functions.ClientFunction then
-					
+
 					if table.find(Arguments, "__return") then
 						if self.ServerToClient and self.ServerToClient.ClientFunctionCalledOnReturn then
 							if self.Functions and self.Functions.ClientFunction then self.Functions.ClientFunction(...) end
@@ -197,7 +203,7 @@ function Network.new(NetworkInfo: NetworkInfo)
 
 						return
 					end
-					
+
 					self.Functions.ClientFunction(...)
 				end
 			end)
