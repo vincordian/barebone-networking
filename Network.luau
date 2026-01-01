@@ -182,7 +182,7 @@ local function setupFoldersAndRemotes(self)
 
 			local Arguments = {...}
 
-			if self.Typechecking.AllowedTypes then
+			if self.Typechecking and self.Typechecking.AllowedTypes then
 
 				for _, Type:unknown in Arguments do
 					if not table.find(self.Typechecking.AllowedTypes, typeof(Type)) then
@@ -191,7 +191,7 @@ local function setupFoldersAndRemotes(self)
 				end
 			end
 
-			if self.Typechecking.DisallowedTypes then
+			if self.Typechecking and self.Typechecking.DisallowedTypes then
 
 				for _, Type:unknown in Arguments do
 					if table.find(self.Typechecking.DisallowedTypes, typeof(Type)) then
@@ -222,7 +222,7 @@ local function setupFoldersAndRemotes(self)
 
 			local Arguments = {...}
 
-			if self.Typechecking.AllowedTypes then
+			if self.Typechecking and self.Typechecking.AllowedTypes then
 
 				for _, Type:unknown in Arguments do
 					if not table.find(self.Typechecking.AllowedTypes, typeof(Type)) then
@@ -231,7 +231,7 @@ local function setupFoldersAndRemotes(self)
 				end
 			end
 
-			if self.Typechecking.DisallowedTypes then
+			if self.Typechecking and self.Typechecking.DisallowedTypes then
 
 				for _, Type:unknown in Arguments do
 					if table.find(self.Typechecking.DisallowedTypes, typeof(Type)) then
