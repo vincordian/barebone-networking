@@ -305,7 +305,6 @@ function Network.new(NetworkInfo: NetworkInfo)
 	if RunService:IsClient() then
 		if NetworkInfo.Functions then
 			assert(not NetworkInfo.Functions.ServerFunction, "You're trying to create a server function while on the client. What you're trying to do is stupid.")
-			assert(not NetworkInfo.ServerToClient.ReturnToClient, "You're trying to create a client return while on the client. What you're trying to do is stupid.")
 		end
 	end
 
