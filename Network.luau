@@ -3,9 +3,21 @@
 client & server can only create their respective functions
 it'll error if you have a client network but not a server one
 
+'Target' will fallback to every *current* player if not specified, or you can provide an empty table.
+using self.Remote will use orthodox RemoteEvent methods instead
+self.Implicit like a buffer if that's how you say it
+
+note that on server, the first argument in type checking isnt counted as it is always expected to be a player
+
 ]]
 
 --!native
+
+
+--Constants--
+
+local WAIT_FOR_CHILD_TIMEOUT = 10
+
 
 --Services--
 
@@ -19,26 +31,45 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 export type NetworkInfo = {
 
 	Main: {
+
 		Name: string,
 		NetworkingDirection: "ClientToServer"|"ServerToClient"|"any",
+
 	},
 
 	ServerToClient: {
+
 		Target : {[number]:Player},
 		AutoAddPlayers: boolean,
 
 		ClientFunctionCalledOnReturn: boolean,
 		ReturnToClient: (Player, any) -> (any),
+
 	},
 
 	Anticheat: {
-		AnticheatFunction: (Player, any) -> (boolean),
+
+		AnticheatFunction: (Player, any) -> (boolean), --returns if false or nil
+
 	},
 
 	Functions: {
+
 		ClientFunction: (Player, any) -> (),
-		ServerFunction: (Player, any) -> ()
-	}
+		ServerFunction: (Player, any) -> (),
+
+	},
+
+	TypeChecking: {
+
+		AllowedTypes:{any}|nil,
+		DisallowedTypes:{any}|nil,
+
+		AllowedTypesFunction: (any) -> (boolean), --first is a player on server
+		DisallowedTypesFunction: (any) -> (boolean), --first is a player on server
+		--returns if false or nil
+
+	},
 
 }
 
@@ -59,10 +90,10 @@ local function setupSelf(NetworkInfo: NetworkInfo)
 	local self = {
 
 		Main = {
-			
+
 			Name = assert(NetworkInfo.Main.Name, "Network has no name."),
 			NetworkingDirection = assert(NetworkInfo.Main.NetworkingDirection, "Network has no NetworkingDirection.")
-			
+
 		},
 
 		ServerToClient = NetworkInfo.ServerToClient and {
@@ -88,11 +119,22 @@ local function setupSelf(NetworkInfo: NetworkInfo)
 
 		},
 
-	}
+		TypeChecking = NetworkInfo.TypeChecking and {
+
+			AllowedTypes = NetworkInfo.TypeChecking.AllowedTypes,
+			DisallowedTypes = NetworkInfo.TypeChecking.DisallowedTypes,
+
+		},
+
+	} :: NetworkInfo
+
+	self.Implicit = {} --stores internal stuff like a buffer
 
 
 	if self.ServerToClient and self.ServerToClient.AutoAddPlayers then
-		self.AutoAddPlayersConnection = Players.PlayerAdded:Connect(function(Player)
+
+		self.Implicit.AutoAddPlayersConnection = Players.PlayerAdded:Connect(function(Player)
+
 			if not table.find(self.ServerToClient.Target, Player) then
 				table.insert(self.ServerToClient.Target, Player)
 			end
@@ -110,7 +152,7 @@ local function setupFoldersAndRemotes(self)
 
 	if not Folder then
 		if RunService:IsClient() then
-			Folder = ReplicatedStorage:WaitForChild("NetworkRemotes", 10)
+			Folder = ReplicatedStorage:WaitForChild("NetworkRemotes", WAIT_FOR_CHILD_TIMEOUT)
 			assert(Folder, "No folder for network found.")
 		else
 			Folder = Instance.new("Folder")
@@ -123,7 +165,7 @@ local function setupFoldersAndRemotes(self)
 
 	if not self.Remote then
 		if RunService:IsClient() then
-			self.Remote = Folder:WaitForChild(self.Main.Name, 10)
+			self.Remote = Folder:WaitForChild(self.Main.Name, WAIT_FOR_CHILD_TIMEOUT)
 			assert(self.Remote, "No remote for network found.")
 		else
 			self.Remote = Instance.new("RemoteEvent")
@@ -135,7 +177,28 @@ local function setupFoldersAndRemotes(self)
 
 	if RunService:IsServer() and self.Main.NetworkingDirection ~= "ServerToClient" then
 
-		self.Remote.OnServerEvent:Connect(function(Player:Player, ...)
+		self.Implicit.OnServerEvent = self.Remote.OnServerEvent:Connect(function(Player:Player, ...)
+
+			local Arguments = {...}
+
+			if self.Typechecking.AllowedTypes then
+
+				for _, Type:unknown in Arguments do
+					if not table.find(self.Typechecking.AllowedTypes, typeof(Type)) then
+						if self.Typechecking.AllowedTypesFunction and not self.Typechecking.AllowedTypesFunction(Type) then return end
+					end
+				end
+			end
+
+			if self.Typechecking.DisallowedTypes then
+
+				for _, Type:unknown in Arguments do
+					if table.find(self.Typechecking.DisallowedTypes, typeof(Type)) then
+						if self.Typechecking.DisallowedTypesFunction and not self.Typechecking.DisallowedTypesFunction(Type) then return end
+					end
+				end
+			end
+
 
 			if self.Anticheat and self.Anticheat.AnticheatFunction and not self.Anticheat.AnticheatFunction(Player, ...) then
 
@@ -154,9 +217,28 @@ local function setupFoldersAndRemotes(self)
 
 	if RunService:IsClient() and self.Main.NetworkingDirection ~= "ClientToServer" then
 
-		self.Remote.OnClientEvent:Connect(function(...)
+		self.Implicit.OnClientEvent = self.Remote.OnClientEvent:Connect(function(...)
 
 			local Arguments = {...}
+
+			if self.Typechecking.AllowedTypes then
+
+				for _, Type:unknown in Arguments do
+					if not table.find(self.Typechecking.AllowedTypes, typeof(Type)) then
+						if self.Typechecking.AllowedTypesFunction and self.Typechecking.AllowedTypesFunction(Type) then return end
+					end
+				end
+			end
+
+			if self.Typechecking.DisallowedTypes then
+
+				for _, Type:unknown in Arguments do
+					if table.find(self.Typechecking.DisallowedTypes, typeof(Type)) then
+						if self.Typechecking.DisallowedTypesFunction and self.Typechecking.AllowedTypesFunction(Type) then return end
+					end
+				end
+			end
+
 
 			if self.Functions and self.Functions.ClientFunction then
 
@@ -179,27 +261,35 @@ end
 
 --[=[
 
-	Main: {
-		Name: string,
-		NetworkingDirection: "ClientToServer"|"ServerToClient"|"any",
-	},
+	Main = {
 
-	ServerToClient: {
-		Target : {[number]:Player},
-		AutoAddPlayers: boolean,
+			Name = assert(NetworkInfo.Main.Name, "Network has no name."),
+			NetworkingDirection = assert(NetworkInfo.Main.NetworkingDirection, "Network has no NetworkingDirection.")
 
-		ClientFunctionCalledOnReturn: boolean,
-		ReturnToClient: (any) -> (any),
-	},
+		},
 
-	Anticheat: {
-		AnticheatFunction: (any) -> (boolean),
-	},
+		ServerToClient = NetworkInfo.ServerToClient and {
 
-	Functions: {
-		ClientFunction: (any) -> (),
-		ServerFunction: (any) -> ()
-	}
+			Target = NetworkInfo.ServerToClient.Target or Players:GetPlayers(),
+			AutoAddPlayers = NetworkInfo.ServerToClient and NetworkInfo.ServerToClient.AutoAddPlayers or false,
+
+			ClientCalledOnReturn = NetworkInfo.ServerToClient and NetworkInfo.ServerToClient.ClientCalledOnReturn or false,
+			ReturnToClient = NetworkInfo.ServerToClient.ReturnToClient,
+
+		},
+
+		Anticheat = NetworkInfo.Anticheat and {
+
+			AnticheatFunction = NetworkInfo.Anticheat.AnticheatFunction,
+
+		},
+
+		Functions = NetworkInfo.Functions and {
+
+			ClientFunction = NetworkInfo.Functions.ClientFunction,
+			ServerFunction = NetworkInfo.Functions.ServerFunction,
+
+		},
 
 ]=]
 function Network.new(NetworkInfo: NetworkInfo)
@@ -257,25 +347,40 @@ function Network:End()
 
 	assert(RunService:IsServer(), "You're trying to end the network while on the client. What you're trying to do is stupid.")
 
-	pcall(function()
+	if self.Remote then
 		self.Remote:Destroy()
+	end
 
-		self:EndAutoPlayers()
+	if self.Implicit then
 
-		setmetatable(self, nil)
-		table.clear(self)
-		self = nil
-	end)
+		if RunService:IsClient() and self.Implicit.OnClientEvent then
+
+			self.Implicit.OnClientEvent:Disconnect()
+
+		elseif RunService:IsServer() and self.Implicit.OnServerEvent then
+
+			self.Implicit.OnServerEvent:Disconnect()
+		end
+	end
+
+	self:EndAutoPlayers()
+
+	setmetatable(self, nil)
+	table.clear(self)
+	self = nil
 end
 
 
 function Network:EndAutoPlayers()
 
 	assert(not RunService:IsClient(), "You're trying to end auto players connection while on the client. What you're trying to do is stupid.")
-	assert(self.AutoAddPlayersConnection, "Auto add players wasn't on anyway")
 
-	self.AutoAddPlayersConnection:Disconnect()
-	self.AutoAddPlayersConnection = nil
+
+	if self.Implicit.AutoAddPlayersConnection then
+		self.Implicit.AutoAddPlayersConnection:Disconnect()
+		self.Implicit.AutoAddPlayersConnection = nil
+	end
+
 
 	return self.Target
 end
