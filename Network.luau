@@ -28,18 +28,18 @@ export type NetworkInfo = {
 		AutoAddPlayers: boolean,
 
 		ClientFunctionCalledOnReturn: boolean,
-		ReturnToClient: (any) -> (any),
+		ReturnToClient: (Player, any) -> (any),
 	},
 
 	Anticheat: {
-		AnticheatFunction: (any) -> (boolean),
+		AnticheatFunction: (Player, any) -> (boolean),
 	},
 
 	Functions: {
-		ClientFunction: (any) -> (),
-		ServerFunction: (any) -> ()
+		ClientFunction: (Player, any) -> (),
+		ServerFunction: (Player, any) -> ()
 	}
-	
+
 }
 
 
@@ -59,8 +59,10 @@ local function setupSelf(NetworkInfo: NetworkInfo)
 	local self = {
 
 		Main = {
+			
 			Name = assert(NetworkInfo.Main.Name, "Network has no name."),
 			NetworkingDirection = assert(NetworkInfo.Main.NetworkingDirection, "Network has no NetworkingDirection.")
+			
 		},
 
 		ServerToClient = NetworkInfo.ServerToClient and {
@@ -88,7 +90,7 @@ local function setupSelf(NetworkInfo: NetworkInfo)
 
 	}
 
-	
+
 	if self.ServerToClient and self.ServerToClient.AutoAddPlayers then
 		self.AutoAddPlayersConnection = Players.PlayerAdded:Connect(function(Player)
 			if not table.find(self.ServerToClient.Target, Player) then
@@ -96,10 +98,82 @@ local function setupSelf(NetworkInfo: NetworkInfo)
 			end
 		end)
 	end
-	
+
 
 	return self
 end
+
+
+local function setupFoldersAndRemotes(self)
+
+	local Folder = ReplicatedStorage:FindFirstChild("NetworkRemotes")
+
+	if not Folder then
+		if RunService:IsClient() then
+			Folder = ReplicatedStorage:WaitForChild("NetworkRemotes", 10)
+			assert(Folder, "No folder for network found.")
+		else
+			Folder = Instance.new("Folder")
+			Folder.Name = "NetworkRemotes"
+			Folder.Parent = ReplicatedStorage
+		end
+	end
+
+	self.Remote = Folder:FindFirstChild(self.Main.Name)
+
+	if not self.Remote then
+		if RunService:IsClient() then
+			self.Remote = Folder:WaitForChild(self.Main.Name, 10)
+			assert(self.Remote, "No remote for network found.")
+		else
+			self.Remote = Instance.new("RemoteEvent")
+			self.Remote.Name = self.Main.Name
+			self.Remote.Parent = Folder
+		end
+	end
+
+
+	if RunService:IsServer() and self.Main.NetworkingDirection ~= "ServerToClient" then
+
+		self.Remote.OnServerEvent:Connect(function(Player:Player, ...)
+
+			if self.Anticheat and self.Anticheat.AnticheatFunction and not self.Anticheat.AnticheatFunction(Player, ...) then
+
+				warn(`Anticheat triggered by {Player.Name}`)
+
+				return
+			end
+
+			if self.Functions and self.Functions.ServerFunction then self.Functions.ServerFunction(Player, ...) end
+
+			if self.ServerToClient and self.ServerToClient.ReturnToClient then
+				self.Remote:FireClient(Player, self.ServerToClient.ReturnToClient(Player, ...), "__return")
+			end
+		end)
+	end
+
+	if RunService:IsClient() and self.Main.NetworkingDirection ~= "ClientToServer" then
+
+		self.Remote.OnClientEvent:Connect(function(...)
+
+			local Arguments = {...}
+
+			if self.Functions and self.Functions.ClientFunction then
+
+				if table.find(Arguments, "__return") then
+					if self.ServerToClient and self.ServerToClient.ClientFunctionCalledOnReturn then
+						if self.Functions and self.Functions.ClientFunction then self.Functions.ClientFunction(...) end
+					end
+
+					return
+				end
+
+				self.Functions.ClientFunction(...)
+			end
+		end)
+	end
+end
+
 
 --Public Functions--
 
@@ -129,9 +203,6 @@ end
 
 ]=]
 function Network.new(NetworkInfo: NetworkInfo)
-	
-	assert(NetworkInfo.Main.Name, "No name provided for the network")
-	assert(NetworkInfo.Main.NetworkingDirection, `No networking direction for {NetworkInfo.Main.Name}`)
 
 	--Important to do this first, as if done in the later IsServer & isClient and throws an error, will waste memory
 
@@ -150,77 +221,7 @@ function Network.new(NetworkInfo: NetworkInfo)
 
 
 	local self = setupSelf(NetworkInfo)
-
-
-	--a really good way to remove local variables if you don't want them
-	--aka too lazy to create another function
-	do
-		local Folder = ReplicatedStorage:FindFirstChild("NetworkRemotes")
-
-		if not Folder then
-			if RunService:IsClient() then
-				Folder = ReplicatedStorage:WaitForChild("NetworkRemotes", 10)
-				assert(Folder, "No folder for network found.")
-			else
-				Folder = Instance.new("Folder")
-				Folder.Name = "NetworkRemotes"
-				Folder.Parent = ReplicatedStorage
-			end
-		end
-
-		self.Remote = Folder:FindFirstChild(self.Main.Name)
-
-		if not self.Remote then
-			if RunService:IsClient() then
-				self.Remote = Folder:WaitForChild(self.Main.Name, 10)
-				assert(self.Remote, "No remote for network found.")
-			else
-				self.Remote = Instance.new("RemoteEvent")
-				self.Remote.Name = self.Main.Name
-				self.Remote.Parent = Folder
-			end
-		end
-
-
-		if RunService:IsServer() then
-			self.Remote.OnServerEvent:Connect(function(Player:Player, ...)
-
-				if self.Anticheat and self.Anticheat.AnticheatFunction and not self.Anticheat.AnticheatFunction(Player, ...) then
-
-					warn(`Anticheat triggered by {Player.Name}`)
-
-					return
-				end
-
-				if self.Functions and self.Functions.ServerFunction then self.Functions.ServerFunction(Player, ...) end
-
-				if self.ServerToClient and self.ServerToClient.ReturnToClient then
-					self.Remote:FireClient(Player, self.ServerToClient.ReturnToClient(Player, ...), "__return")
-				end
-			end)
-		end
-
-		if RunService:IsClient() then
-			self.Remote.OnClientEvent:Connect(function(...)
-
-				local Arguments = {...}
-
-				if self.Functions and self.Functions.ClientFunction then
-
-					if table.find(Arguments, "__return") then
-						if self.ServerToClient and self.ServerToClient.ClientFunctionCalledOnReturn then
-							if self.Functions and self.Functions.ClientFunction then self.Functions.ClientFunction(...) end
-						end
-
-						return
-					end
-
-					self.Functions.ClientFunction(...)
-				end
-			end)
-		end
-
-	end
+	setupFoldersAndRemotes(self)
 
 	return self
 end
@@ -228,10 +229,11 @@ end
 
 --Fires the targets, to fire a specific one try self.Remote:FireClient(Player, ...)
 function Network:FireClient(...)
+
 	assert(RunService:IsServer(), "You're trying to fire clients while on the client. What you're trying to do is stupid.")
 	assert(self.Main.NetworkingDirection == "ServerToClient" or self.Main.NetworkingDirection == "any", "You're trying to fire the client while having the networking direction of ClientToServer.")
 
-	for _, Player:Player in self.Target do
+	for _, Player:Player in self.ServerToClient.Target do
 		self.Remote:FireClient(Player, ...)
 	end
 
@@ -240,6 +242,7 @@ end
 
 
 function Network:FireServer(...)
+
 	assert(RunService:IsClient(), "You're trying to fire server while on the server. What you're trying to do is stupid.")
 	assert(self.Main.NetworkingDirection == "ClientToServer" or self.Main.NetworkingDirection == "any", "You're trying to fire the Server while having the networking direction of ServerToClient.")
 
@@ -251,17 +254,26 @@ end
 
 --Should be used on the server
 function Network:End()
+
 	assert(RunService:IsServer(), "You're trying to end the network while on the client. What you're trying to do is stupid.")
-	self.Remote:Destroy()
-	setmetatable(self, nil)
-	table.clear(self)
-	self = nil
+
+	pcall(function()
+		self.Remote:Destroy()
+
+		self:EndAutoPlayers()
+
+		setmetatable(self, nil)
+		table.clear(self)
+		self = nil
+	end)
 end
 
 
-
 function Network:EndAutoPlayers()
+
 	assert(not RunService:IsClient(), "You're trying to end auto players connection while on the client. What you're trying to do is stupid.")
+	assert(self.AutoAddPlayersConnection, "Auto add players wasn't on anyway")
+
 	self.AutoAddPlayersConnection:Disconnect()
 	self.AutoAddPlayersConnection = nil
 
