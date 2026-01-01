@@ -140,7 +140,8 @@ local function setupSelf(NetworkInfo: NetworkInfo)
 			end
 		end)
 	end
-
+	
+	setmetatable(self, Network)
 
 	return self
 end
