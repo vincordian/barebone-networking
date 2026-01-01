@@ -342,10 +342,8 @@ function Network:FireServer(...)
 end
 
 
---Should be used on the server
+--Should be used on the server to end all the clients
 function Network:End()
-
-	assert(RunService:IsServer(), "You're trying to end the network while on the client. What you're trying to do is stupid.")
 
 	if self.Remote then
 		self.Remote:Destroy()
