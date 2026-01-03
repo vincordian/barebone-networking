@@ -39,35 +39,36 @@ export type NetworkInfo = {
 
 	ServerToClient: {
 
-		Target : {[number]:Player},
-		AutoAddPlayers: boolean,
+		Target : {[number]:Player}, --targets for firing client
+		AutoAddPlayers: boolean, --self explanatory
 
-		ClientFunctionCalledOnReturn: boolean,
-		ReturnToClient: (Player, any) -> (any),
+		ClientFunctionCalledOnReturn: boolean, --pretty self explanatory
+		ReturnToClient: (Player, any) -> (any), --will fire client back with this function's return
 
 	},
 
 	Anticheat: {
 
-		AnticheatFunction: (Player, any) -> (boolean), --returns if false or nil
+		AnticheatFunction: (Player, any) -> (boolean), --if it returns false/nil then it will exit the current thread
 
 	},
 
 	Functions: {
 
-		ClientFunction: (Player, any) -> (),
-		ServerFunction: (Player, any) -> (),
+		ClientFunction: (Player, any) -> (), --fires on OnClientEvent
+		ServerFunction: (Player, any) -> (), --fired on OnServerEvent
 
 	},
 
 	TypeChecking: {
 
-		AllowedTypes:{any}|nil,
+		AllowedTypes:{any}|nil, --if it detects anything not in list of allowed types (case sensitive, also check your spelling) then it will 
 		DisallowedTypes:{any}|nil,
 
-		AllowedTypesFunction: (any) -> (boolean), --first is a player on server
-		DisallowedTypesFunction: (any) -> (boolean), --first is a player on server
-		--returns if false or nil
+		AllowedTypesFunction: (any) -> (boolean),
+		DisallowedTypesFunction: (any) -> (boolean),
+		--parameters: type,
+        --if it returns false/nil then it will exit that current thread
 
 	},
 
@@ -82,6 +83,7 @@ Network.__index = Network
 
 --Private Functions-- (had to place this infront as I need the network table for this to work)
 
+--constructs self to be used in colon notattion functions
 local function setupSelf(NetworkInfo: NetworkInfo)
 
 	assert(NetworkInfo, "You didn't even provide NetworkInfo what are you doing..")
@@ -147,6 +149,7 @@ local function setupSelf(NetworkInfo: NetworkInfo)
 end
 
 
+--pretty self explanatory
 local function setupFoldersAndRemotes(self)
 
 	local Folder = ReplicatedStorage:FindFirstChild("NetworkRemotes")
@@ -264,15 +267,15 @@ end
 
 	Main = {
 
-			Name = assert(NetworkInfo.Main.Name, "Network has no name."),
+			Name = assert(NetworkInfo.Main.Name, "Network has no name."), --assert returns the input which is nice
 			NetworkingDirection = assert(NetworkInfo.Main.NetworkingDirection, "Network has no NetworkingDirection.")
 
 		},
 
 		ServerToClient = NetworkInfo.ServerToClient and {
 
-			Target = NetworkInfo.ServerToClient.Target or Players:GetPlayers(),
-			AutoAddPlayers = NetworkInfo.ServerToClient and NetworkInfo.ServerToClient.AutoAddPlayers or false,
+			Target = NetworkInfo.ServerToClient.Target or Players:GetPlayers(), --or keyword will divert the assignment to the next statement thingy
+			AutoAddPlayers = NetworkInfo.ServerToClient and NetworkInfo.ServerToClient.AutoAddPlayers or false, --and keyword will check if first condition isn't false/nil, and diverts it into another condition if so
 
 			ClientCalledOnReturn = NetworkInfo.ServerToClient and NetworkInfo.ServerToClient.ClientCalledOnReturn or false,
 			ReturnToClient = NetworkInfo.ServerToClient.ReturnToClient,
@@ -299,18 +302,18 @@ function Network.new(NetworkInfo: NetworkInfo)
 
 	if RunService:IsServer() then
 		if NetworkInfo.Functions then
-			assert(not NetworkInfo.Functions.ClientFunction, "You're trying to create a client function while on the server. What you're trying to do is stupid.")
+			assert(not NetworkInfo.Functions.ClientFunction, "ClientFunction is only supported on the client")
 		end
 	end
 
 	if RunService:IsClient() then
 		if NetworkInfo.Functions then
-			assert(not NetworkInfo.Functions.ServerFunction, "You're trying to create a server function while on the client. What you're trying to do is stupid.")
+			assert(not NetworkInfo.Functions.ServerFunction, "ServerFunction is only supported on the server")
 		end
 	end
 
 
-	local self = setupSelf(NetworkInfo)
+	local self = setupSelf(NetworkInfo) --lowercase to match self keyword
 	setupFoldersAndRemotes(self)
 
 	return self
@@ -320,7 +323,7 @@ end
 --Fires the targets, to fire a specific one try self.Remote:FireClient(Player, ...)
 function Network:FireClient(...)
 
-	assert(RunService:IsServer(), "You're trying to fire clients while on the client. What you're trying to do is stupid.")
+	assert(RunService:IsServer(), "FireClient is only supported on the server.")
 	assert(self.Main.NetworkingDirection == "ServerToClient" or self.Main.NetworkingDirection == "any", "You're trying to fire the client while having the networking direction of ClientToServer.")
 
 	for _, Player:Player in self.ServerToClient.Target do
@@ -333,8 +336,8 @@ end
 
 function Network:FireServer(...)
 
-	assert(RunService:IsClient(), "You're trying to fire server while on the server. What you're trying to do is stupid.")
-	assert(self.Main.NetworkingDirection == "ClientToServer" or self.Main.NetworkingDirection == "any", "You're trying to fire the Server while having the networking direction of ServerToClient.")
+	assert(RunService:IsClient(), "FireServer is only supported on the client")
+    assert(self.Main.NetworkingDirection == "ClientToServer" or self.Main.NetworkingDirection == "any", "You're trying to fire the Server while having the networking direction of ServerToClient.")
 
 	self.Remote:FireServer(...)
 
@@ -362,7 +365,7 @@ function Network:End()
 	end
 
 	self:EndAutoPlayers()
-
+    --GC since i don't think its removed afterwards
 	setmetatable(self, nil)
 	table.clear(self)
 	self = nil
@@ -371,12 +374,12 @@ end
 
 function Network:EndAutoPlayers()
 
-	assert(not RunService:IsClient(), "You're trying to end auto players connection while on the client. What you're trying to do is stupid.")
+	assert(not RunService:IsClient(), "EndAutoPlayers is only supported on the server.")
 
 
 	if self.Implicit.AutoAddPlayersConnection then
 		self.Implicit.AutoAddPlayersConnection:Disconnect()
-		self.Implicit.AutoAddPlayersConnection = nil
+		self.Implicit.AutoAddPlayersConnection = nil --GC, again
 	end
 
 
@@ -385,3 +388,4 @@ end
 
 
 return Network
+
