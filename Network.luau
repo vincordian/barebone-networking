@@ -355,12 +355,12 @@ function Network:End()
 	if self.Implicit then
 
 		if RunService:IsClient() and self.Implicit.OnClientEvent then
-			
-			self:EndAutoPlayers()
 
 			self.Implicit.OnClientEvent:Disconnect()
 
 		elseif RunService:IsServer() and self.Implicit.OnServerEvent then
+			
+			self:EndAutoPlayers()
 
 			self.Implicit.OnServerEvent:Disconnect()
 		end
