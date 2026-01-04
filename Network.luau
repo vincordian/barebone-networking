@@ -68,7 +68,7 @@ export type NetworkInfo = {
 		AllowedTypesFunction: (any) -> (boolean),
 		DisallowedTypesFunction: (any) -> (boolean),
 		--parameters: type,
-        --if it returns false/nil then it will exit that current thread
+		--if it returns false/nil then it will exit that current thread
 
 	},
 
@@ -142,7 +142,7 @@ local function setupSelf(NetworkInfo: NetworkInfo)
 			end
 		end)
 	end
-	
+
 	setmetatable(self, Network)
 
 	return self
@@ -337,7 +337,7 @@ end
 function Network:FireServer(...)
 
 	assert(RunService:IsClient(), "FireServer is only supported on the client")
-    assert(self.Main.NetworkingDirection == "ClientToServer" or self.Main.NetworkingDirection == "any", "You're trying to fire the Server while having the networking direction of ServerToClient.")
+	assert(self.Main.NetworkingDirection == "ClientToServer" or self.Main.NetworkingDirection == "any", "You're trying to fire the Server while having the networking direction of ServerToClient.")
 
 	self.Remote:FireServer(...)
 
@@ -355,6 +355,8 @@ function Network:End()
 	if self.Implicit then
 
 		if RunService:IsClient() and self.Implicit.OnClientEvent then
+			
+			self:EndAutoPlayers()
 
 			self.Implicit.OnClientEvent:Disconnect()
 
@@ -364,8 +366,7 @@ function Network:End()
 		end
 	end
 
-	self:EndAutoPlayers()
-    --GC since i don't think its removed afterwards
+	--GC since i don't think its removed afterwards
 	setmetatable(self, nil)
 	table.clear(self)
 	self = nil
@@ -388,4 +389,3 @@ end
 
 
 return Network
-
