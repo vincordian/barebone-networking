@@ -61,14 +61,15 @@ export type NetworkInfo = {
 	},
 
 	TypeChecking: {
-
-		AllowedTypes:{any}|nil, --if it detects anything not in list of allowed types (case sensitive, also check your spelling) then it will 
+		--Keep in mind these are DICTIONARY LISTS not number arrays due to the time complexity of table.find() being worse
+		AllowedTypes:{any}|nil, --if it detects anything not in list of allowed types (case sensitive, also check your spelling) then it will exit the current thread
 		DisallowedTypes:{any}|nil,
 
 		AllowedTypesFunction: (any) -> (boolean),
 		DisallowedTypesFunction: (any) -> (boolean),
 		--parameters: type,
 		--if it returns false/nil then it will exit that current thread
+		--aka if it returns error code "not true"
 
 	},
 
@@ -83,7 +84,7 @@ Network.__index = Network
 
 --Private Functions-- (had to place this infront as I need the network table for this to work)
 
---constructs self to be used in colon notattion functions
+--constructs self to be used in colon notation functions
 local function setupSelf(NetworkInfo: NetworkInfo)
 
 	assert(NetworkInfo, "You didn't even provide NetworkInfo what are you doing..")
@@ -103,7 +104,7 @@ local function setupSelf(NetworkInfo: NetworkInfo)
 			Target = NetworkInfo.ServerToClient.Target or Players:GetPlayers(),
 			AutoAddPlayers = NetworkInfo.ServerToClient and NetworkInfo.ServerToClient.AutoAddPlayers or false,
 
-			ClientCalledOnReturn = NetworkInfo.ServerToClient and NetworkInfo.ServerToClient.ClientCalledOnReturn or false,
+			ClientCalledOnReturn = NetworkInfo.ServerToClient and NetworkInfo.ServerToClient.ClientFunctionCalledOnReturn or false,
 			ReturnToClient = NetworkInfo.ServerToClient.ReturnToClient,
 
 		},
@@ -149,6 +150,35 @@ local function setupSelf(NetworkInfo: NetworkInfo)
 end
 
 
+local function checkTypes(self, ...)
+	
+	if not self.TypeChecking then return true end
+	
+	local Arguments = {...}
+	
+	for _, Argument in Arguments do
+		
+		if self.TypeChecking.AllowedTypes and self.TypeChecking.AllowedTypes[typeof(Argument)] ~= true then
+			return false
+		end
+		
+		if self.TypeChecking.DisallowedTypes and self.TypeChecking.DisallowedTypes[typeof(Argument)] then
+			return false
+		end
+		
+		if self.TypeChecking.AllowedTypesFunction and not self.TypeChecking.AllowedTypesFunction(Argument) then
+			return false
+		end
+		
+		if self.TypeChecking.DisallowedTypesFunction and not self.TypeChecking.DisallowedTypesFunction(Argument) then
+			return false
+		end
+	end
+	
+	return true
+end
+
+
 --pretty self explanatory
 local function setupFoldersAndRemotes(self)
 
@@ -182,26 +212,12 @@ local function setupFoldersAndRemotes(self)
 	if RunService:IsServer() and self.Main.NetworkingDirection ~= "ServerToClient" then
 
 		self.Implicit.OnServerEvent = self.Remote.OnServerEvent:Connect(function(Player:Player, ...)
+			
+			if self.Main.NetworkingDirection == "ServerToClient" then warn(`Player {Player} is sending remote signals to server even though the NetworkingDirection is {self.Main.NetworkingDirection}\n exiting current network thread.`) return end
 
 			local Arguments = {...}
 
-			if self.Typechecking and self.Typechecking.AllowedTypes then
-
-				for _, Type:unknown in Arguments do
-					if not table.find(self.Typechecking.AllowedTypes, typeof(Type)) then
-						if self.Typechecking.AllowedTypesFunction and not self.Typechecking.AllowedTypesFunction(Type) then return end
-					end
-				end
-			end
-
-			if self.Typechecking and self.Typechecking.DisallowedTypes then
-
-				for _, Type:unknown in Arguments do
-					if table.find(self.Typechecking.DisallowedTypes, typeof(Type)) then
-						if self.Typechecking.DisallowedTypesFunction and not self.Typechecking.DisallowedTypesFunction(Type) then return end
-					end
-				end
-			end
+			if not checkTypes(self, ...) then return end
 
 
 			if self.Anticheat and self.Anticheat.AnticheatFunction and not self.Anticheat.AnticheatFunction(Player, ...) then
@@ -225,28 +241,13 @@ local function setupFoldersAndRemotes(self)
 
 			local Arguments = {...}
 
-			if self.Typechecking and self.Typechecking.AllowedTypes then
-
-				for _, Type:unknown in Arguments do
-					if not table.find(self.Typechecking.AllowedTypes, typeof(Type)) then
-						if self.Typechecking.AllowedTypesFunction and self.Typechecking.AllowedTypesFunction(Type) then return end
-					end
-				end
-			end
-
-			if self.Typechecking and self.Typechecking.DisallowedTypes then
-
-				for _, Type:unknown in Arguments do
-					if table.find(self.Typechecking.DisallowedTypes, typeof(Type)) then
-						if self.Typechecking.DisallowedTypesFunction and self.Typechecking.AllowedTypesFunction(Type) then return end
-					end
-				end
-			end
-
+			checkTypes(self, ...)
+			
 
 			if self.Functions and self.Functions.ClientFunction then
 
 				if table.find(Arguments, "__return") then
+					
 					if self.ServerToClient and self.ServerToClient.ClientFunctionCalledOnReturn then
 						if self.Functions and self.Functions.ClientFunction then self.Functions.ClientFunction(...) end
 					end
@@ -263,39 +264,6 @@ end
 
 --Public Functions--
 
---[=[
-
-	Main = {
-
-			Name = assert(NetworkInfo.Main.Name, "Network has no name."), --assert returns the input which is nice
-			NetworkingDirection = assert(NetworkInfo.Main.NetworkingDirection, "Network has no NetworkingDirection.")
-
-		},
-
-		ServerToClient = NetworkInfo.ServerToClient and {
-
-			Target = NetworkInfo.ServerToClient.Target or Players:GetPlayers(), --or keyword will divert the assignment to the next statement thingy
-			AutoAddPlayers = NetworkInfo.ServerToClient and NetworkInfo.ServerToClient.AutoAddPlayers or false, --and keyword will check if first condition isn't false/nil, and diverts it into another condition if so
-
-			ClientCalledOnReturn = NetworkInfo.ServerToClient and NetworkInfo.ServerToClient.ClientCalledOnReturn or false,
-			ReturnToClient = NetworkInfo.ServerToClient.ReturnToClient,
-
-		},
-
-		Anticheat = NetworkInfo.Anticheat and {
-
-			AnticheatFunction = NetworkInfo.Anticheat.AnticheatFunction,
-
-		},
-
-		Functions = NetworkInfo.Functions and {
-
-			ClientFunction = NetworkInfo.Functions.ClientFunction,
-			ServerFunction = NetworkInfo.Functions.ServerFunction,
-
-		},
-
-]=]
 function Network.new(NetworkInfo: NetworkInfo)
 
 	--Important to do this first, as if done in the later IsServer & isClient and throws an error, will waste memory
@@ -359,7 +327,7 @@ function Network:End()
 			self.Implicit.OnClientEvent:Disconnect()
 
 		elseif RunService:IsServer() and self.Implicit.OnServerEvent then
-			
+
 			self:EndAutoPlayers()
 
 			self.Implicit.OnServerEvent:Disconnect()
