@@ -288,8 +288,8 @@ function Network.new(NetworkInfo: NetworkInfo)
 end
 
 
---Fires the targets, to fire a specific one try self.Remote:FireClient(Player, ...)
-function Network:FireClient(...)
+--Fires the targets in network constructor, to fire a specific one try self.Remote:FireClient(Player, ...)
+function Network:FireClientTargets(...)
 
 	assert(RunService:IsServer(), "FireClient is only supported on the server.")
 	assert(self.Main.NetworkingDirection == "ServerToClient" or self.Main.NetworkingDirection == "any", "You're trying to fire the client while having the networking direction of ClientToServer.")
@@ -310,6 +310,18 @@ function Network:FireServer(...)
 	self.Remote:FireServer(...)
 
 	return self
+end
+
+
+--Incase you need a special occasion that requires you to fire specific clients e.g. specific client-sided vfx's.
+function Network:FireSpecificClients(Players: {Player}, ...)
+	
+	assert(RunService:IsServer(), "FireSpecificClients is only supported on the server")
+	assert(self.Main.NetworkingDirection == "ServerToClient" or self.Main.NetworkingDirection == "any", "You're trying to fire the client while having the networking direction of ClientToServer.")
+	
+	for _, Player:Player in Players do
+		self.Remote:FireClient(Player, ...)
+	end
 end
 
 
