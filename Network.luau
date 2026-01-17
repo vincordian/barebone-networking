@@ -29,7 +29,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 --Types--
 
 export type NetworkInfo = {
-
+	
 	Main: {
 
 		Name: string,
@@ -313,14 +313,18 @@ function Network:FireServer(...)
 end
 
 
---Incase you need a special occasion that requires you to fire specific clients e.g. specific client-sided vfx's.
-function Network:FireSpecificClients(Players: {Player}, ...)
+--Incase you need a special occasion that requires you to fire specific clients e.g. specific vfx's
+function Network:FireSpecificClients(Players: {Player}|Player, ...)
 	
 	assert(RunService:IsServer(), "FireSpecificClients is only supported on the server")
 	assert(self.Main.NetworkingDirection == "ServerToClient" or self.Main.NetworkingDirection == "any", "You're trying to fire the client while having the networking direction of ClientToServer.")
 	
-	for _, Player:Player in Players do
-		self.Remote:FireClient(Player, ...)
+	if typeof(Players) == "Instance" then
+		self.Remote:FireClient(Players, ...) --if its not a table and instead just a player
+	else
+		for _, Player:Player in Players do
+			self.Remote:FireClient(Player, ...)
+		end
 	end
 end
 
