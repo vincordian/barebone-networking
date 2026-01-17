@@ -39,28 +39,30 @@ export type NetworkInfo = {
 
 	ServerToClient: {
 
-		Target : {[number]:Player}, --targets for firing client
-		AutoAddPlayers: boolean, --self explanatory
+		Target : {[number]:Player}, --targets for firing client, if empty then it will default to all CURRENT players, serversided
+		AutoAddPlayers: boolean, --self explanatory, serversided
 
-		ClientFunctionCalledOnReturn: boolean, --pretty self explanatory
-		ReturnToClient: (Player, any) -> (any), --will fire client back with this function's return
+		ClientFunctionCalledOnReturn: boolean, --pretty self explanatory, clientsided
+		ReturnToClient: (Player, any) -> (any), --will fire client back with this function's return, serversided (basically a remote function, but only the server can return a value)
 
 	},
 
 	Anticheat: {
 
-		AnticheatFunction: (Player, any) -> (boolean), --if it returns false/nil then it will exit the current thread
+		AnticheatFunction: (Player, any) -> (boolean), --if it returns false/nil then it will exit the current thread, serversided
 
 	},
 
 	Functions: {
 
-		ClientFunction: (Player, any) -> (), --fires on OnClientEvent
-		ServerFunction: (Player, any) -> (), --fired on OnServerEvent
+		ClientFunction: (Player, any) -> (), --fires on OnClientEvent ..which means clientsided
+		ServerFunction: (Player, any) -> (), --fired on OnServerEvent ..which means serversided
 
 	},
 
 	TypeChecking: {
+		
+		--all of these are serversided
 		--Keep in mind these are DICTIONARY LISTS not number arrays due to the time complexity of table.find() being worse
 		AllowedTypes:{any}|nil, --if it detects anything not in list of allowed types (case sensitive, also check your spelling) then it will exit the current thread
 		DisallowedTypes:{any}|nil,
